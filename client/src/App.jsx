@@ -3,33 +3,29 @@ import Navbar from './components/Navbar'
 import Hero from './components/Hero'
 import DashboardPreview from './components/DashboardPreview'
 import Features from './components/Features'
-import BudgetCalculator from './components/BudgetCalculator'
-import UseCases from './components/UseCases'
 import HowItWorks from './components/HowItWorks'
-import SecuritySection from './components/SecuritySection'
-import FAQSection from './components/FAQSection'
 import CTASection from './components/CTASection'
 import Footer from './components/Footer'
 import AuthenticatedDashboard from './components/AuthenticatedDashboard'
+import BackgroundAnimation from './components/BackgroundAnimation'
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-white text-slate-900 flex flex-col font-sans selection:bg-emerald-100 selection:text-emerald-900">
+    <div className="relative min-h-screen bg-white/90 dark:bg-slate-950/90 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-emerald-100 selection:text-emerald-900 dark:selection:bg-emerald-900/40 dark:selection:text-emerald-200 transition-colors">
+      {/* Minimal Geometric Background Animation Throughout Entire Page */}
+      <BackgroundAnimation />
+
       {/* Navigation Header */}
       <Navbar />
 
       {/* Main Body */}
       <main className="flex-1">
-        {/* Public Visitor Experience */}
+        {/* Public Visitor Experience: Streamlined, minimal, conversion-focused */}
         <Show when="signed-out">
           <Hero />
           <DashboardPreview />
           <Features />
-          <BudgetCalculator />
-          <UseCases />
           <HowItWorks />
-          <SecuritySection />
-          <FAQSection />
           <CTASection />
         </Show>
 
