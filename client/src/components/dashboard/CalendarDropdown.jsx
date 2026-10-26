@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 const FULL_MONTH_NAMES = [
@@ -84,16 +85,25 @@ export default function CalendarDropdown({
     setCalYear(t.getFullYear())
     const mm = String(t.getMonth() + 1).padStart(2, '0')
     const dd = String(t.getDate()).padStart(2, '0')
-    onSelectDate(`${t.getFullYear()}-${mm}-${dd}`)
+    const todayStr = `${t.getFullYear()}-${mm}-${dd}`
+    onSelectDate(todayStr)
     setCalendarOpen(false)
+    toast('Filtering for today', { icon: '📅' })
   }
 
   const handleSelectDay = (dateStr) => {
     if (!dateStr) return
     if (selectedDate === dateStr) {
       onSelectDate(null) // toggle off
+      toast('Showing all dates', { icon: '📅' })
     } else {
       onSelectDate(dateStr)
+      const formatted = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      })
+      toast(`Filtering for ${formatted}`, { icon: '📅' })
     }
     setCalendarOpen(false)
   }

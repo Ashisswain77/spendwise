@@ -8,6 +8,10 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  --toast-bg: #ffffff;
+  --toast-color: #0f172a;
+  --toast-border: #e2e8f0;
 }
 
 * {
@@ -132,6 +136,9 @@ button {
 html.dark {
   color-scheme: dark;
   background-color: #000000;
+  --toast-bg: #121212;
+  --toast-color: #f8fafc;
+  --toast-border: rgba(255, 255, 255, 0.12);
 }
 
 html.dark body {

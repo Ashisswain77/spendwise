@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import toast from 'react-hot-toast'
 import {
   List as ListIcon,
   LayoutGrid,
@@ -12,18 +13,26 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Coffee,
-  Utensils,
+  Citrus,
   ShoppingBag,
-  CreditCard,
-  Building,
-  TrendingUp,
-  CircleDollarSign,
+  Car,
+  Home,
+  Receipt,
+  Clapperboard,
+  Plane,
+  Users,
   HeartPulse,
-  Truck,
+  GraduationCap,
+  ShoppingCart,
+  Gift,
+  Dumbbell,
+  Sparkles,
+  Briefcase,
+  CircleDollarSign,
   Layers,
 } from 'lucide-react'
 import { formatINR } from '../../utils/currency'
+import { EXPENSE_CATEGORIES } from '../../utils/categories'
 
 export default function TransactionList({
   transactions = [],
@@ -55,11 +64,11 @@ export default function TransactionList({
 
   // Unique lists for dropdowns
   const categories = (() => {
-    const set = new Set()
+    const set = new Set(EXPENSE_CATEGORIES)
     transactions.forEach((t) => {
       if (t.category) set.add(t.category)
     })
-    return Array.from(set).sort()
+    return Array.from(set)
   })()
 
   const wallets = (() => {
@@ -79,40 +88,64 @@ export default function TransactionList({
     setTimeFilter('all')
     setCurrentPage(1)
     setSelectedIds(new Set())
+    toast('Filters cleared', { icon: '🔄' })
   }
 
-  // Handle refresh
+  // Handle refresh with toast.promise
   const handleRefreshClick = () => {
     setIsRefreshing(true)
-    if (onRefresh) onRefresh()
-    setTimeout(() => setIsRefreshing(false), 600)
+    const refreshAction = new Promise((resolve) => {
+      if (onRefresh) onRefresh()
+      setTimeout(() => {
+        setIsRefreshing(false)
+        resolve()
+      }, 500)
+    })
+
+    toast.promise(refreshAction, {
+      loading: 'Refreshing transactions...',
+      success: 'Transactions updated!',
+      error: 'Failed to refresh transactions',
+    })
   }
 
-  // Google Sheets / CSV Export
+  // Google Sheets / CSV Export with toast.promise
   const handleExportSheets = () => {
-    if (filteredTransactions.length === 0) return
+    if (filteredTransactions.length === 0) {
+      toast.error('No transactions to export with current filters.')
+      return
+    }
 
-    const headers = ['Date', 'Category', 'Note', 'Wallet', 'Type', 'Amount (INR)']
-    const rows = filteredTransactions.map((t) => [
-      `"${t.date}"`,
-      `"${t.category || ''}"`,
-      `"${(t.title || '').replace(/"/g, '""')}"`,
-      `"${t.mode || 'DEFAULT'}"`,
-      `"${t.type}"`,
-      t.amount,
-    ])
+    const exportAction = new Promise((resolve) => {
+      const headers = ['Date', 'Category', 'Note', 'Wallet', 'Type', 'Amount (INR)']
+      const rows = filteredTransactions.map((t) => [
+        `"${t.date}"`,
+        `"${t.category || ''}"`,
+        `"${(t.title || '').replace(/"/g, '""')}"`,
+        `"${t.mode || 'DEFAULT'}"`,
+        `"${t.type}"`,
+        t.amount,
+      ])
 
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n')
+      const csvContent =
+        'data:text/csv;charset=utf-8,' +
+        [headers.join(','), ...rows.map((e) => e.join(','))].join('\n')
 
-    const encodedUri = encodeURI(csvContent)
-    const link = document.createElement('a')
-    link.setAttribute('href', encodedUri)
-    link.setAttribute('download', `SpendWise_Transactions_${new Date().toISOString().split('T')[0]}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+      const encodedUri = encodeURI(csvContent)
+      const link = document.createElement('a')
+      link.setAttribute('href', encodedUri)
+      link.setAttribute('download', `SpendWise_Transactions_${new Date().toISOString().split('T')[0]}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      setTimeout(resolve, 300)
+    })
+
+    toast.promise(exportAction, {
+      loading: 'Exporting to Google Sheets CSV...',
+      success: `Exported ${filteredTransactions.length} transactions successfully!`,
+      error: 'Export failed',
+    })
   }
 
   // Filter logic
@@ -233,46 +266,88 @@ export default function TransactionList({
     }
 
     switch (category) {
-      case 'Food & Dining':
       case 'Food & drink':
+      case 'Food & Dining':
         return {
-          icon: <Utensils className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />,
-          bg: 'bg-amber-50 border border-amber-200/80 dark:bg-amber-950/80 dark:border-amber-800/60',
-        }
-      case 'Coffee':
-        return {
-          icon: <Coffee className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />,
-          bg: 'bg-amber-50 border border-amber-200/80 dark:bg-amber-950/80 dark:border-amber-800/60',
-        }
-      case 'Housing & Rent':
-        return {
-          icon: <Building className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />,
-          bg: 'bg-rose-50 border border-rose-200/80 dark:bg-rose-950/80 dark:border-rose-800/60',
+          icon: <Citrus className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />,
+          bg: 'bg-orange-50 border border-orange-200/80 dark:bg-orange-950/80 dark:border-orange-800/60',
         }
       case 'Shopping':
         return {
           icon: <ShoppingBag className="w-3.5 h-3.5 text-pink-600 dark:text-pink-400" />,
           bg: 'bg-pink-50 border border-pink-200/80 dark:bg-pink-950/80 dark:border-pink-800/60',
         }
-      case 'Investments':
-        return {
-          icon: <TrendingUp className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />,
-          bg: 'bg-cyan-50 border border-cyan-200/80 dark:bg-cyan-950/80 dark:border-cyan-800/60',
-        }
-      case 'Utilities & Bills':
-        return {
-          icon: <CreditCard className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />,
-          bg: 'bg-purple-50 border border-purple-200/80 dark:bg-purple-950/80 dark:border-purple-800/60',
-        }
       case 'Transport':
         return {
-          icon: <Truck className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />,
+          icon: <Car className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />,
+          bg: 'bg-amber-50 border border-amber-200/80 dark:bg-amber-950/80 dark:border-amber-800/60',
+        }
+      case 'Home':
+      case 'Housing & Rent':
+        return {
+          icon: <Home className="w-3.5 h-3.5 text-stone-700 dark:text-stone-300" />,
+          bg: 'bg-stone-100 border border-stone-200/80 dark:bg-stone-900/80 dark:border-stone-800/60',
+        }
+      case 'Bills & fees':
+      case 'Utilities & Bills':
+        return {
+          icon: <Receipt className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />,
           bg: 'bg-teal-50 border border-teal-200/80 dark:bg-teal-950/80 dark:border-teal-800/60',
+        }
+      case 'Entertainment':
+        return {
+          icon: <Clapperboard className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />,
+          bg: 'bg-orange-50 border border-orange-200/80 dark:bg-orange-950/80 dark:border-orange-800/60',
+        }
+      case 'Car':
+        return {
+          icon: <Car className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />,
+          bg: 'bg-sky-50 border border-sky-200/80 dark:bg-sky-950/80 dark:border-sky-800/60',
+        }
+      case 'Travel':
+        return {
+          icon: <Plane className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />,
+          bg: 'bg-rose-50 border border-rose-200/80 dark:bg-rose-950/80 dark:border-rose-800/60',
+        }
+      case 'Family & personal':
+        return {
+          icon: <Users className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />,
+          bg: 'bg-sky-50 border border-sky-200/80 dark:bg-sky-950/80 dark:border-sky-800/60',
         }
       case 'Healthcare':
         return {
-          icon: <HeartPulse className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />,
-          bg: 'bg-red-50 border border-red-200/80 dark:bg-red-950/80 dark:border-red-800/60',
+          icon: <HeartPulse className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />,
+          bg: 'bg-rose-50 border border-rose-200/80 dark:bg-rose-950/80 dark:border-rose-800/60',
+        }
+      case 'Education':
+        return {
+          icon: <GraduationCap className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />,
+          bg: 'bg-blue-50 border border-blue-200/80 dark:bg-blue-950/80 dark:border-blue-800/60',
+        }
+      case 'Groceries':
+        return {
+          icon: <ShoppingCart className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />,
+          bg: 'bg-amber-50 border border-amber-200/80 dark:bg-amber-950/80 dark:border-amber-800/60',
+        }
+      case 'Gifts':
+        return {
+          icon: <Gift className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />,
+          bg: 'bg-emerald-50 border border-emerald-200/80 dark:bg-emerald-950/80 dark:border-emerald-800/60',
+        }
+      case 'Sport & hobbies':
+        return {
+          icon: <Dumbbell className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />,
+          bg: 'bg-green-50 border border-green-200/80 dark:bg-green-950/80 dark:border-green-800/60',
+        }
+      case 'Beauty':
+        return {
+          icon: <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />,
+          bg: 'bg-purple-50 border border-purple-200/80 dark:bg-purple-950/80 dark:border-purple-800/60',
+        }
+      case 'Work':
+        return {
+          icon: <Briefcase className="w-3.5 h-3.5 text-slate-700 dark:text-slate-300" />,
+          bg: 'bg-slate-100 border border-slate-200/80 dark:bg-slate-800/80 dark:border-slate-700/60',
         }
       default:
         return {

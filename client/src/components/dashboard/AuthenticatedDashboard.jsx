@@ -1,7 +1,6 @@
-import { useState, useMemo, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { useState, useMemo } from 'react'
 import { useUser } from '@clerk/react'
-import { CheckCircle2, X, Target } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 import useTransactions from '../../hooks/useTransactions'
 import DashboardHeader from './DashboardHeader'
@@ -11,22 +10,10 @@ import CategoryDoughnutChart from '../charts/CategoryDoughnutChart'
 import TransactionModal from '../transactions/TransactionModal'
 import TransactionList from '../transactions/TransactionList'
 import BudgetTracker from '../budgets/BudgetTracker'
+import GoalTracker from '../goals/GoalTracker'
+import { CATEGORY_COLORS } from '../../utils/categories'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-const CATEGORY_COLORS = {
-  'Salary': '#10B981',
-  'Freelance': '#06B6D4',
-  'Investments': '#6366F1',
-  'Housing & Rent': '#F43F5E',
-  'Food & Dining': '#F59E0B',
-  'Food & drink': '#F59E0B',
-  'Utilities & Bills': '#8B5CF6',
-  'Shopping': '#EC4899',
-  'Transport': '#14B8A6',
-  'Healthcare': '#EF4444',
-  'Other': '#64748B',
-}
 
 export default function AuthenticatedDashboard({ activeTab = 'Dashboard', onTabChange = () => {} }) {
   const { user } = useUser()
@@ -49,15 +36,6 @@ export default function AuthenticatedDashboard({ activeTab = 'Dashboard', onTabC
   const [chartPeriod, setChartPeriod] = useState('monthly')
   const [modalType, setModalType] = useState(null)
   const [editingTransaction, setEditingTransaction] = useState(null)
-  const [toast, setToast] = useState('')
-
-  // Toast auto-clear
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(''), 3500)
-      return () => clearTimeout(timer)
-    }
-  }, [toast])
 
   const handleOpenAddModal = (type = 'expense') => {
     setEditingTransaction(null)
@@ -77,22 +55,22 @@ export default function AuthenticatedDashboard({ activeTab = 'Dashboard', onTabC
   const handleSaveTransaction = (savedTx) => {
     if (editingTransaction) {
       updateTransaction(savedTx)
-      setToast('Transaction updated successfully!')
+      toast.success('Transaction updated successfully!')
     } else {
       addTransaction(savedTx)
-      setToast(`${savedTx.type === 'income' ? 'Income' : 'Expense'} of ₹${savedTx.amount.toLocaleString('en-IN')} added!`)
+      toast.success(`${savedTx.type === 'income' ? 'Income' : 'Expense'} of ₹${savedTx.amount.toLocaleString('en-IN')} added!`)
     }
     handleCloseModal()
   }
 
   const handleDeleteTransaction = (id) => {
     deleteTransaction(id)
-    setToast('Transaction deleted successfully.')
+    toast.success('Transaction deleted successfully.')
   }
 
   const handleDeleteMultiple = (ids) => {
     deleteMultipleTransactions(ids)
-    setToast(`${ids.length} transactions deleted successfully.`)
+    toast.success(`${ids.length} transactions deleted successfully.`)
   }
 
   // 12-Month Bar Chart Aggregation
@@ -161,21 +139,6 @@ export default function AuthenticatedDashboard({ activeTab = 'Dashboard', onTabC
 
   return (
     <div className="space-y-8 animate-fadeIn pb-12">
-      {/* Toast Notification Alert */}
-      {toast && typeof document !== 'undefined' &&
-        createPortal(
-          <div className="fixed top-20 right-6 z-[100] p-4 rounded-2xl bg-emerald-600 text-white text-sm font-semibold flex items-center justify-between gap-3 shadow-xl animate-fadeIn">
-            <span className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-              {toast}
-            </span>
-            <button type="button" onClick={() => setToast('')} className="text-emerald-100 hover:text-white cursor-pointer">
-              <X className="w-4 h-4" />
-            </button>
-          </div>,
-          document.body
-        )}
-
       {/* DASHBOARD HEADER: Only shown on Dashboard tab */}
       {activeTab === 'Dashboard' && (
         <DashboardHeader
@@ -237,24 +200,7 @@ export default function AuthenticatedDashboard({ activeTab = 'Dashboard', onTabC
       )}
 
       {/* GOALS TAB */}
-      {activeTab === 'Goals' && (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-8 shadow-xs text-center animate-fadeIn space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 mx-auto flex items-center justify-center">
-            <Target className="w-6 h-6" />
-          </div>
-          <h3 className="text-base font-bold text-slate-900 dark:text-white">Savings &amp; Financial Goals</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-            Set and track savings milestones, emergency funds, and future purchase targets. Financial goal planning is coming soon!
-          </p>
-          <button
-            type="button"
-            onClick={() => onTabChange('Dashboard')}
-            className="px-4 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition cursor-pointer"
-          >
-            Back to Dashboard
-          </button>
-        </div>
-      )}
+      {activeTab === 'Goals' && <GoalTracker />}
 
       {/* TRANSACTION MODAL (Add / Edit) */}
       <TransactionModal

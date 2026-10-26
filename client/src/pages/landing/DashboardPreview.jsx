@@ -19,10 +19,10 @@ import {
   Building,
   ShoppingBag,
   Coffee,
-  CheckCircle,
   RotateCcw,
   Sparkles,
 } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { formatINR } from '../../utils/currency'
 
 const timeframeData = {
@@ -71,7 +71,6 @@ export default function DashboardPreview() {
   const [outflow, setOutflow] = useState(38450)
   const [categories, setCategories] = useState(defaultCategories)
   const [selectedCategory, setSelectedCategory] = useState(null)
-  const [toastMessage, setToastMessage] = useState('')
   const [lastActionType, setLastActionType] = useState(null)
 
   // Dynamic Savings Rate calculation
@@ -97,7 +96,7 @@ export default function DashboardPreview() {
     if (action.type === 'income') {
       setBalance((prev) => prev + action.amount)
       setInflow((prev) => prev + action.amount)
-      setToastMessage(`Inflow added: +${formatINR(action.amount)} (${action.title})`)
+      toast.success(`Inflow added: +${formatINR(action.amount)} (${action.title})`)
     } else {
       setBalance((prev) => prev - action.amount)
       setOutflow((prev) => prev + action.amount)
@@ -109,10 +108,9 @@ export default function DashboardPreview() {
             : cat
         )
       )
-      setToastMessage(`Expense logged: ${formatINR(action.amount)} for ${action.category}`)
+      toast.success(`Expense logged: ${formatINR(action.amount)} for ${action.category}`)
     }
 
-    setTimeout(() => setToastMessage(''), 3500)
     setTimeout(() => setLastActionType(null), 1200)
   }
 
@@ -123,8 +121,7 @@ export default function DashboardPreview() {
     setOutflow(38450)
     setCategories(defaultCategories)
     setSelectedCategory(null)
-    setToastMessage('Reset demo data to default')
-    setTimeout(() => setToastMessage(''), 2500)
+    toast.success('Reset demo data to default')
   }
 
   return (
@@ -227,23 +224,6 @@ export default function DashboardPreview() {
               </button>
             </div>
           </div>
-
-          {/* Toast Notification Alert */}
-          {toastMessage && (
-            <div className="mb-5 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center justify-between animate-fadeIn">
-              <span className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-                {toastMessage}
-              </span>
-              <button
-                type="button"
-                onClick={() => setToastMessage('')}
-                className="text-emerald-400 hover:text-white text-sm leading-none ml-2 cursor-pointer"
-              >
-                &times;
-              </button>
-            </div>
-          )}
 
           {/* 1. INR Balance & Metric Cards with Dynamic Highlights */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 mb-7">

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { PlusCircle, MinusCircle, X, AlertCircle, Edit3 } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../../utils/categories'
 
 export default function TransactionModal({
   modalType,
@@ -14,7 +16,7 @@ export default function TransactionModal({
   const [formTitle, setFormTitle] = useState(initialTransaction?.title || '')
   const [formAmount, setFormAmount] = useState(initialTransaction ? String(initialTransaction.amount) : '')
   const [formCategory, setFormCategory] = useState(
-    initialTransaction?.category || (effectiveType === 'income' ? 'Salary' : 'Food & Dining')
+    initialTransaction?.category || (effectiveType === 'income' ? 'Salary' : 'Food & drink')
   )
   const [formDate, setFormDate] = useState(
     initialTransaction?.date || new Date().toISOString().split('T')[0]
@@ -45,15 +47,21 @@ export default function TransactionModal({
 
     const numericAmount = parseFloat(formAmount)
     if (!formTitle.trim()) {
-      setFormError('Please enter a description or merchant name.')
+      const msg = 'Please enter a description or merchant name.'
+      setFormError(msg)
+      toast.error(msg)
       return
     }
     if (isNaN(numericAmount) || numericAmount <= 0) {
-      setFormError('Please enter a valid amount greater than ₹0.')
+      const msg = 'Please enter a valid amount greater than ₹0.'
+      setFormError(msg)
+      toast.error(msg)
       return
     }
     if (!formDate) {
-      setFormError('Please select a valid date.')
+      const msg = 'Please select a valid date.'
+      setFormError(msg)
+      toast.error(msg)
       return
     }
 
@@ -167,25 +175,17 @@ export default function TransactionModal({
                 className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs focus:border-emerald-600 focus:outline-hidden cursor-pointer"
               >
                 {effectiveType === 'income' ? (
-                  <>
-                    <option value="Salary">Salary</option>
-                    <option value="Freelance">Freelance</option>
-                    <option value="Investments">Investments</option>
-                    <option value="Allowance">Allowance</option>
-                    <option value="Gifts">Gifts</option>
-                    <option value="Other">Other Income</option>
-                  </>
+                  INCOME_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))
                 ) : (
-                  <>
-                    <option value="Food & Dining">Food &amp; Dining</option>
-                    <option value="Housing & Rent">Housing &amp; Rent</option>
-                    <option value="Utilities & Bills">Utilities &amp; Bills</option>
-                    <option value="Shopping">Shopping</option>
-                    <option value="Investments">Investments / SIP</option>
-                    <option value="Transport">Transport</option>
-                    <option value="Healthcare">Healthcare</option>
-                    <option value="Other">Other Expenses</option>
-                  </>
+                  EXPENSE_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))
                 )}
               </select>
             </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { useUser } from '@clerk/react'
+import toast from 'react-hot-toast'
 import { formatINR } from '../../utils/currency'
 import { loadStoredBudgets, saveStoredBudgets } from '../../services/transactionService'
 import BudgetModal from './BudgetModal'
@@ -83,8 +84,10 @@ export default function BudgetTracker({ transactions = [] }) {
       setBudgets((prev) =>
         prev.map((b) => (b.id === savedBudget.id ? savedBudget : b))
       )
+      toast.success(`Budget updated for ${savedBudget.category}!`)
     } else {
       setBudgets((prev) => [savedBudget, ...prev])
+      toast.success(`Budget created for ${savedBudget.category}!`)
     }
     setModalOpen(false)
     setEditingBudget(null)
@@ -92,6 +95,7 @@ export default function BudgetTracker({ transactions = [] }) {
 
   const handleDeleteBudget = (id) => {
     setBudgets((prev) => prev.filter((b) => b.id !== id))
+    toast.success('Budget deleted successfully.')
   }
 
   return (

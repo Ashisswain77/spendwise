@@ -1,18 +1,8 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, ChevronDown, ChevronsUpDown, AlertCircle } from 'lucide-react'
-
-const AVAILABLE_CATEGORIES = [
-  'Food & Dining',
-  'Housing & Rent',
-  'Utilities & Bills',
-  'Shopping',
-  'Investments',
-  'Transport',
-  'Healthcare',
-  'Entertainment',
-  'Other',
-]
+import toast from 'react-hot-toast'
+import { EXPENSE_CATEGORIES, CATEGORY_CONFIG } from '../../utils/categories'
 
 export default function BudgetModal({
   isOpen,
@@ -62,7 +52,9 @@ export default function BudgetModal({
 
     const numericAmount = parseFloat(amount)
     if (isNaN(numericAmount) || numericAmount <= 0) {
-      setError('Please enter a valid budget amount greater than ₹0.')
+      const msg = 'Please enter a valid budget amount greater than ₹0.'
+      setError(msg)
+      toast.error(msg)
       return
     }
 
@@ -71,22 +63,7 @@ export default function BudgetModal({
       category: category.trim() === '' ? 'Overall' : category,
       limit: numericAmount,
       period: period,
-      color:
-        category === 'Housing & Rent'
-          ? 'bg-rose-500'
-          : category === 'Food & Dining'
-          ? 'bg-amber-500'
-          : category === 'Investments'
-          ? 'bg-cyan-500'
-          : category === 'Utilities & Bills'
-          ? 'bg-purple-500'
-          : category === 'Shopping'
-          ? 'bg-pink-500'
-          : category === 'Transport'
-          ? 'bg-teal-500'
-          : category === 'Healthcare'
-          ? 'bg-red-500'
-          : 'bg-emerald-500',
+      color: CATEGORY_CONFIG[category]?.badgeColor || 'bg-emerald-500',
     }
 
     onSave(budgetData)
@@ -151,7 +128,7 @@ export default function BudgetModal({
                 className="w-full appearance-none pl-3.5 pr-8 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/60 dark:bg-zinc-900 text-slate-900 dark:text-zinc-100 text-xs font-medium focus:border-amber-700 dark:focus:border-amber-600 focus:outline-hidden cursor-pointer"
               >
                 <option value="">All categories (overall)</option>
-                {AVAILABLE_CATEGORIES.map((cat) => (
+                {EXPENSE_CATEGORIES.map((cat) => (
                   <option key={cat} value={cat}>
                     {cat}
                   </option>
