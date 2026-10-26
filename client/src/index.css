@@ -127,3 +127,41 @@ textarea {
 button {
   cursor: pointer;
 }
+
+/* Deep black palette for dark mode */
+html.dark {
+  color-scheme: dark;
+  background-color: #000000;
+}
+
+html.dark body {
+  background-color: #000000;
+  color: #f8fafc;
+}
+
+/* Deep pure black surface overrides */
+.dark .dark\:bg-slate-950,
+.dark .dark\:bg-slate-950\/90,
+.dark .dark\:bg-slate-950\/80,
+.dark .dark\:bg-slate-950\/60 {
+  background-color: #000000 !important;
+}
+
+.dark .dark\:bg-slate-900,
+.dark .dark\:bg-slate-900\/80,
+.dark .dark\:bg-slate-900\/50 {
+  background-color: #09090b !important;
+}
+
+.dark .dark\:bg-slate-800 {
+  background-color: #121215 !important;
+}
+
+.dark .dark\:border-slate-800,
+.dark .dark\:border-slate-800\/80 {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.dark .dark\:border-slate-700 {
+  border-color: rgba(255, 255, 255, 0.14) !important;
+}

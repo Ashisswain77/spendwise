@@ -23,7 +23,7 @@ import {
   RotateCcw,
   Sparkles,
 } from 'lucide-react'
-import { formatINR } from '../utils/currency'
+import { formatINR } from '../../utils/currency'
 
 const timeframeData = {
   '3M': [

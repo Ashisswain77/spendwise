@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Receipt, SlidersHorizontal, BarChart3, Target, CheckCircle2, Sparkles } from 'lucide-react'
-import { formatINR } from '../utils/currency'
+import { formatINR } from '../../utils/currency'
 
 const features = [
   {
@@ -45,7 +45,7 @@ export default function Features() {
   const goalPercent = Math.min(100, Math.round((goalSaved / goalTarget) * 100))
 
   return (
-    <section id="features" className="py-16 md:py-24 bg-white dark:bg-slate-950 transition-colors">
+    <section id="features" className="py-16 md:py-24 bg-white dark:bg-black">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-12">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-semibold mb-3">

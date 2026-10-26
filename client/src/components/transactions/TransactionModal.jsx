@@ -1,0 +1,215 @@
+import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
+import { PlusCircle, MinusCircle, X, AlertCircle } from 'lucide-react'
+
+export default function TransactionModal({ modalType, onClose, onSave }) {
+  const [formTitle, setFormTitle] = useState('')
+  const [formAmount, setFormAmount] = useState('')
+  const [formCategory, setFormCategory] = useState(modalType === 'income' ? 'Salary' : 'Food & Dining')
+  const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0])
+  const [formMode, setFormMode] = useState('UPI')
+  const [formError, setFormError] = useState('')
+
+  // Lock body scroll and close on Escape key when modal is open
+  useEffect(() => {
+    if (!modalType) return
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = originalOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [modalType, onClose])
+
+  if (!modalType || typeof document === 'undefined') return null
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    setFormError('')
+
+    const numericAmount = parseFloat(formAmount)
+    if (!formTitle.trim()) {
+      setFormError('Please enter a description or merchant name.')
+      return
+    }
+    if (isNaN(numericAmount) || numericAmount <= 0) {
+      setFormError('Please enter a valid amount greater than ₹0.')
+      return
+    }
+    if (!formDate) {
+      setFormError('Please select a valid date.')
+      return
+    }
+
+    onSave({
+      id: Date.now().toString(),
+      title: formTitle.trim(),
+      amount: numericAmount,
+      type: modalType,
+      category: formCategory,
+      date: formDate,
+      mode: formMode,
+    })
+  }
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800 animate-fadeIn">
+        <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100 dark:border-slate-800">
+          <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            {modalType === 'income' ? (
+              <>
+                <PlusCircle className="w-4 h-4 text-emerald-600" />
+                <span>Record New Income</span>
+              </>
+            ) : (
+              <>
+                <MinusCircle className="w-4 h-4 text-rose-600" />
+                <span>Record New Expense</span>
+              </>
+            )}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {formError && (
+          <div className="mb-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 text-rose-700 dark:text-rose-300 text-xs font-medium flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{formError}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
+              Description / Merchant *
+            </label>
+            <input
+              type="text"
+              required
+              placeholder={modalType === 'income' ? 'e.g. October Salary, Freelance project' : 'e.g. Swiggy, Apartment Rent, Electricity'}
+              value={formTitle}
+              onChange={(e) => setFormTitle(e.target.value)}
+              className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs focus:border-emerald-600 focus:outline-hidden"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
+                Amount in ₹ (INR) *
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                required
+                placeholder="e.g. 1500"
+                value={formAmount}
+                onChange={(e) => setFormAmount(e.target.value)}
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs focus:border-emerald-600 focus:outline-hidden"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
+                Date *
+              </label>
+              <input
+                type="date"
+                required
+                value={formDate}
+                onChange={(e) => setFormDate(e.target.value)}
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs focus:border-emerald-600 focus:outline-hidden"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
+                Category *
+              </label>
+              <select
+                value={formCategory}
+                onChange={(e) => setFormCategory(e.target.value)}
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs focus:border-emerald-600 focus:outline-hidden cursor-pointer"
+              >
+                {modalType === 'income' ? (
+                  <>
+                    <option value="Salary">Salary</option>
+                    <option value="Freelance">Freelance</option>
+                    <option value="Investments">Investments</option>
+                    <option value="Allowance">Allowance</option>
+                    <option value="Gifts">Gifts</option>
+                    <option value="Other">Other Income</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="Housing & Rent">Housing &amp; Rent</option>
+                    <option value="Food & Dining">Food &amp; Dining</option>
+                    <option value="Utilities & Bills">Utilities &amp; Bills</option>
+                    <option value="Shopping">Shopping</option>
+                    <option value="Investments">Investments / SIP</option>
+                    <option value="Transport">Transport</option>
+                    <option value="Healthcare">Healthcare</option>
+                    <option value="Other">Other Expenses</option>
+                  </>
+                )}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
+                Payment Mode
+              </label>
+              <select
+                value={formMode}
+                onChange={(e) => setFormMode(e.target.value)}
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs focus:border-emerald-600 focus:outline-hidden cursor-pointer"
+              >
+                <option value="UPI">UPI (GPay / PhonePe)</option>
+                <option value="Credit Card">Credit Card</option>
+                <option value="Net Banking">Net Banking</option>
+                <option value="Debit Card">Debit Card</option>
+                <option value="Cash">Cash</option>
+                <option value="AutoPay">AutoPay / Mandate</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="pt-3 flex items-center justify-end gap-2.5">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-xl transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition cursor-pointer"
+            >
+              Save {modalType === 'income' ? 'Income' : 'Expense'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>,
+    document.body
+  )
+}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { SignUpButton, Show } from '@clerk/react'
 import { ArrowRight, LayoutDashboard, Sparkles, Calculator } from 'lucide-react'
-import { formatINR } from '../utils/currency'
+import { formatINR } from '../../utils/currency'
 
 const incomePresets = [
   { label: '₹40,000/mo', income: 40000 },
@@ -111,5 +111,3 @@ export default function Hero() {
     </section>
   )
 }
-
-
