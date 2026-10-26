@@ -1,18 +1,30 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { PlusCircle, MinusCircle, X, AlertCircle } from 'lucide-react'
+import { PlusCircle, MinusCircle, X, AlertCircle, Edit3 } from 'lucide-react'
 
-export default function TransactionModal({ modalType, onClose, onSave }) {
-  const [formTitle, setFormTitle] = useState('')
-  const [formAmount, setFormAmount] = useState('')
-  const [formCategory, setFormCategory] = useState(modalType === 'income' ? 'Salary' : 'Food & Dining')
-  const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0])
-  const [formMode, setFormMode] = useState('UPI')
+export default function TransactionModal({
+  modalType,
+  initialTransaction = null,
+  onClose,
+  onSave,
+}) {
+  const isEditing = Boolean(initialTransaction)
+  const effectiveType = initialTransaction?.type || modalType
+
+  const [formTitle, setFormTitle] = useState(initialTransaction?.title || '')
+  const [formAmount, setFormAmount] = useState(initialTransaction ? String(initialTransaction.amount) : '')
+  const [formCategory, setFormCategory] = useState(
+    initialTransaction?.category || (effectiveType === 'income' ? 'Salary' : 'Food & Dining')
+  )
+  const [formDate, setFormDate] = useState(
+    initialTransaction?.date || new Date().toISOString().split('T')[0]
+  )
+  const [formMode, setFormMode] = useState(initialTransaction?.mode || 'UPI')
   const [formError, setFormError] = useState('')
 
   // Lock body scroll and close on Escape key when modal is open
   useEffect(() => {
-    if (!modalType) return
+    if (!modalType && !initialTransaction) return
     const originalOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const handleKeyDown = (e) => {
@@ -23,9 +35,9 @@ export default function TransactionModal({ modalType, onClose, onSave }) {
       document.body.style.overflow = originalOverflow
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [modalType, onClose])
+  }, [modalType, initialTransaction, onClose])
 
-  if (!modalType || typeof document === 'undefined') return null
+  if ((!modalType && !initialTransaction) || typeof document === 'undefined') return null
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -46,10 +58,10 @@ export default function TransactionModal({ modalType, onClose, onSave }) {
     }
 
     onSave({
-      id: Date.now().toString(),
+      id: initialTransaction?.id || Date.now().toString(),
       title: formTitle.trim(),
       amount: numericAmount,
-      type: modalType,
+      type: effectiveType,
       category: formCategory,
       date: formDate,
       mode: formMode,
@@ -66,7 +78,12 @@ export default function TransactionModal({ modalType, onClose, onSave }) {
       <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800 animate-fadeIn">
         <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100 dark:border-slate-800">
           <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            {modalType === 'income' ? (
+            {isEditing ? (
+              <>
+                <Edit3 className="w-4 h-4 text-amber-500" />
+                <span>Edit {effectiveType === 'income' ? 'Income' : 'Expense'}</span>
+              </>
+            ) : effectiveType === 'income' ? (
               <>
                 <PlusCircle className="w-4 h-4 text-emerald-600" />
                 <span>Record New Income</span>
@@ -97,12 +114,12 @@ export default function TransactionModal({ modalType, onClose, onSave }) {
         <form onSubmit={handleSubmit} className="space-y-3.5">
           <div>
             <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-              Description / Merchant *
+              Description / Note *
             </label>
             <input
               type="text"
               required
-              placeholder={modalType === 'income' ? 'e.g. October Salary, Freelance project' : 'e.g. Swiggy, Apartment Rent, Electricity'}
+              placeholder={effectiveType === 'income' ? 'e.g. October Salary, Freelance project' : 'e.g. Swiggy, Apartment Rent, Electricity'}
               value={formTitle}
               onChange={(e) => setFormTitle(e.target.value)}
               className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs focus:border-emerald-600 focus:outline-hidden"
@@ -149,7 +166,7 @@ export default function TransactionModal({ modalType, onClose, onSave }) {
                 onChange={(e) => setFormCategory(e.target.value)}
                 className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs focus:border-emerald-600 focus:outline-hidden cursor-pointer"
               >
-                {modalType === 'income' ? (
+                {effectiveType === 'income' ? (
                   <>
                     <option value="Salary">Salary</option>
                     <option value="Freelance">Freelance</option>
@@ -160,8 +177,8 @@ export default function TransactionModal({ modalType, onClose, onSave }) {
                   </>
                 ) : (
                   <>
-                    <option value="Housing & Rent">Housing &amp; Rent</option>
                     <option value="Food & Dining">Food &amp; Dining</option>
+                    <option value="Housing & Rent">Housing &amp; Rent</option>
                     <option value="Utilities & Bills">Utilities &amp; Bills</option>
                     <option value="Shopping">Shopping</option>
                     <option value="Investments">Investments / SIP</option>
@@ -175,13 +192,14 @@ export default function TransactionModal({ modalType, onClose, onSave }) {
 
             <div>
               <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-                Payment Mode
+                Wallet / Payment Mode
               </label>
               <select
                 value={formMode}
                 onChange={(e) => setFormMode(e.target.value)}
                 className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs focus:border-emerald-600 focus:outline-hidden cursor-pointer"
               >
+                <option value="DEFAULT">DEFAULT</option>
                 <option value="UPI">UPI (GPay / PhonePe)</option>
                 <option value="Credit Card">Credit Card</option>
                 <option value="Net Banking">Net Banking</option>
@@ -204,7 +222,7 @@ export default function TransactionModal({ modalType, onClose, onSave }) {
               type="submit"
               className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition cursor-pointer"
             >
-              Save {modalType === 'income' ? 'Income' : 'Expense'}
+              {isEditing ? 'Save Changes' : `Save ${effectiveType === 'income' ? 'Income' : 'Expense'}`}
             </button>
           </div>
         </form>

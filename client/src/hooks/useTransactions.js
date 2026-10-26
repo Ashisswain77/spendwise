@@ -29,8 +29,23 @@ export function useTransactions() {
     setTransactions((prev) => [newTx, ...prev])
   }
 
+  const updateTransaction = (updatedTx) => {
+    setTransactions((prev) =>
+      prev.map((t) => (t.id === updatedTx.id ? { ...t, ...updatedTx } : t))
+    )
+  }
+
   const deleteTransaction = (id) => {
     setTransactions((prev) => prev.filter((t) => t.id !== id))
+  }
+
+  const deleteMultipleTransactions = (ids) => {
+    const set = new Set(ids)
+    setTransactions((prev) => prev.filter((t) => !set.has(t.id)))
+  }
+
+  const refreshTransactions = () => {
+    setTransactions(loadStoredTransactions(userId))
   }
 
   // Filtered transactions based on selected date or date range
@@ -87,7 +102,10 @@ export function useTransactions() {
     totalExpenses,
     remaining,
     addTransaction,
+    updateTransaction,
     deleteTransaction,
+    deleteMultipleTransactions,
+    refreshTransactions,
   }
 }
 

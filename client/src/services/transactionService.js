@@ -1,5 +1,5 @@
 /**
- * Service for managing user transactions, defaults, and persistence.
+ * Service for managing user transactions, defaults, budgets, and persistence.
  */
 
 export const DEFAULT_TRANSACTIONS = [
@@ -12,12 +12,12 @@ export const DEFAULT_TRANSACTIONS = [
 ]
 
 export const DEFAULT_BUDGETS = [
-  { category: 'Housing & Rent', limit: 20000, color: 'bg-indigo-500' },
-  { category: 'Food & Dining', limit: 12000, color: 'bg-emerald-500' },
-  { category: 'Investments', limit: 15000, color: 'bg-cyan-500' },
-  { category: 'Utilities & Bills', limit: 5000, color: 'bg-amber-500' },
-  { category: 'Shopping', limit: 6000, color: 'bg-rose-500' },
-  { category: 'Transport', limit: 4000, color: 'bg-teal-500' },
+  { id: '1', category: 'Housing & Rent', limit: 20000, period: 'Monthly', color: 'bg-indigo-500' },
+  { id: '2', category: 'Food & Dining', limit: 12000, period: 'Monthly', color: 'bg-emerald-500' },
+  { id: '3', category: 'Investments', limit: 15000, period: 'Monthly', color: 'bg-cyan-500' },
+  { id: '4', category: 'Utilities & Bills', limit: 5000, period: 'Monthly', color: 'bg-amber-500' },
+  { id: '5', category: 'Shopping', limit: 6000, period: 'Monthly', color: 'bg-rose-500' },
+  { id: '6', category: 'Transport', limit: 4000, period: 'Monthly', color: 'bg-teal-500' },
 ]
 
 export function getStorageKey(userId) {
@@ -43,5 +43,27 @@ export function saveStoredTransactions(userId, transactions) {
     localStorage.setItem(key, JSON.stringify(transactions))
   } catch (err) {
     console.error('Error saving stored transactions:', err)
+  }
+}
+
+export function loadStoredBudgets(userId) {
+  if (typeof window === 'undefined') return []
+  try {
+    const key = userId ? `spendwise_budgets_${userId}` : 'spendwise_budgets_guest'
+    const saved = localStorage.getItem(key)
+    if (saved) return JSON.parse(saved)
+  } catch (err) {
+    console.error('Error loading stored budgets:', err)
+  }
+  return []
+}
+
+export function saveStoredBudgets(userId, budgets) {
+  if (typeof window === 'undefined') return
+  try {
+    const key = userId ? `spendwise_budgets_${userId}` : 'spendwise_budgets_guest'
+    localStorage.setItem(key, JSON.stringify(budgets))
+  } catch (err) {
+    console.error('Error saving stored budgets:', err)
   }
 }

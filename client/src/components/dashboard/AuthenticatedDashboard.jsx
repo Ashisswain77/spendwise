@@ -20,6 +20,7 @@ const CATEGORY_COLORS = {
   'Investments': '#6366F1',
   'Housing & Rent': '#F43F5E',
   'Food & Dining': '#F59E0B',
+  'Food & drink': '#F59E0B',
   'Utilities & Bills': '#8B5CF6',
   'Shopping': '#EC4899',
   'Transport': '#14B8A6',
@@ -39,11 +40,15 @@ export default function AuthenticatedDashboard({ activeTab = 'Dashboard', onTabC
     totalExpenses,
     remaining,
     addTransaction,
+    updateTransaction,
     deleteTransaction,
+    deleteMultipleTransactions,
+    refreshTransactions,
   } = useTransactions()
 
   const [chartPeriod, setChartPeriod] = useState('monthly')
   const [modalType, setModalType] = useState(null)
+  const [editingTransaction, setEditingTransaction] = useState(null)
   const [toast, setToast] = useState('')
 
   // Toast auto-clear
@@ -54,15 +59,40 @@ export default function AuthenticatedDashboard({ activeTab = 'Dashboard', onTabC
     }
   }, [toast])
 
-  const handleSaveTransaction = (newTx) => {
-    addTransaction(newTx)
+  const handleOpenAddModal = (type = 'expense') => {
+    setEditingTransaction(null)
+    setModalType(type)
+  }
+
+  const handleOpenEditModal = (tx) => {
+    setEditingTransaction(tx)
+    setModalType(tx.type || 'expense')
+  }
+
+  const handleCloseModal = () => {
     setModalType(null)
-    setToast(`${newTx.type === 'income' ? 'Income' : 'Expense'} of ₹${newTx.amount.toLocaleString('en-IN')} added!`)
+    setEditingTransaction(null)
+  }
+
+  const handleSaveTransaction = (savedTx) => {
+    if (editingTransaction) {
+      updateTransaction(savedTx)
+      setToast('Transaction updated successfully!')
+    } else {
+      addTransaction(savedTx)
+      setToast(`${savedTx.type === 'income' ? 'Income' : 'Expense'} of ₹${savedTx.amount.toLocaleString('en-IN')} added!`)
+    }
+    handleCloseModal()
   }
 
   const handleDeleteTransaction = (id) => {
     deleteTransaction(id)
     setToast('Transaction deleted successfully.')
+  }
+
+  const handleDeleteMultiple = (ids) => {
+    deleteMultipleTransactions(ids)
+    setToast(`${ids.length} transactions deleted successfully.`)
   }
 
   // 12-Month Bar Chart Aggregation
@@ -146,14 +176,16 @@ export default function AuthenticatedDashboard({ activeTab = 'Dashboard', onTabC
           document.body
         )}
 
-      {/* DASHBOARD HEADER */}
-      <DashboardHeader
-        userName={user?.firstName}
-        selectedDate={selectedDate}
-        onSelectDate={setSelectedDate}
-        transactions={transactions}
-        onOpenModal={setModalType}
-      />
+      {/* DASHBOARD HEADER: Only shown on Dashboard tab */}
+      {activeTab === 'Dashboard' && (
+        <DashboardHeader
+          userName={user?.firstName}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+          transactions={transactions}
+          onOpenModal={handleOpenAddModal}
+        />
+      )}
 
       {/* ACTIVE SUBVIEWS / TABS */}
       {activeTab === 'Dashboard' && (
@@ -178,20 +210,25 @@ export default function AuthenticatedDashboard({ activeTab = 'Dashboard', onTabC
               categoryData={categoryDoughnutData}
               totalExpenses={totalExpenses}
               dateRange={dateRange}
-              onAddExpense={() => setModalType('expense')}
+              onAddExpense={() => handleOpenAddModal('expense')}
             />
           </div>
         </div>
       )}
 
+      {/* HISTORY TAB */}
       {activeTab === 'History' && (
         <TransactionList
           transactions={transactions}
+          onAddTransaction={() => handleOpenAddModal('expense')}
+          onUpdateTransaction={handleOpenEditModal}
           onDeleteTransaction={handleDeleteTransaction}
-          onBackToDashboard={() => onTabChange('Dashboard')}
+          onDeleteMultiple={handleDeleteMultiple}
+          onRefresh={refreshTransactions}
         />
       )}
 
+      {/* BUDGET TAB */}
       {activeTab === 'Budget' && (
         <BudgetTracker
           transactions={transactions}
@@ -199,6 +236,7 @@ export default function AuthenticatedDashboard({ activeTab = 'Dashboard', onTabC
         />
       )}
 
+      {/* GOALS TAB */}
       {activeTab === 'Goals' && (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-8 shadow-xs text-center animate-fadeIn space-y-3">
           <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 mx-auto flex items-center justify-center">
@@ -218,10 +256,11 @@ export default function AuthenticatedDashboard({ activeTab = 'Dashboard', onTabC
         </div>
       )}
 
-      {/* TRANSACTION MODAL */}
+      {/* TRANSACTION MODAL (Add / Edit) */}
       <TransactionModal
         modalType={modalType}
-        onClose={() => setModalType(null)}
+        initialTransaction={editingTransaction}
+        onClose={handleCloseModal}
         onSave={handleSaveTransaction}
       />
     </div>
