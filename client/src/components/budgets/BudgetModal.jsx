@@ -7,6 +7,7 @@ import { EXPENSE_CATEGORIES, CATEGORY_CONFIG } from '../../utils/categories'
 export default function BudgetModal({
   isOpen,
   initialBudget = null,
+  existingBudgets = [],
   onClose,
   onSave,
 }) {
@@ -58,9 +59,25 @@ export default function BudgetModal({
       return
     }
 
+    const targetCategory = category.trim() === '' ? 'Overall' : category
+    const isDuplicate = existingBudgets.some(
+      (b) =>
+        b.id !== initialBudget?.id &&
+        b.category.toLowerCase() === targetCategory.toLowerCase() &&
+        (b.period || 'Monthly').toLowerCase() === period.toLowerCase()
+    )
+
+    if (isDuplicate) {
+      const displayCat = targetCategory === 'Overall' ? 'All categories (overall)' : targetCategory
+      const msg = `A ${period} budget for "${displayCat}" already exists.`
+      setError(msg)
+      toast.error(msg)
+      return
+    }
+
     const budgetData = {
       id: initialBudget?.id || Date.now().toString(),
-      category: category.trim() === '' ? 'Overall' : category,
+      category: targetCategory,
       limit: numericAmount,
       period: period,
       color: CATEGORY_CONFIG[category]?.badgeColor || 'bg-emerald-500',

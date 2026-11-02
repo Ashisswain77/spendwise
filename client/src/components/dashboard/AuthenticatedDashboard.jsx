@@ -73,49 +73,58 @@ export default function AuthenticatedDashboard({ activeTab = 'Dashboard', onTabC
     toast.success(`${ids.length} transactions deleted successfully.`)
   }
 
-  // 12-Month Bar Chart Aggregation
-  const monthlyChartData = useMemo(() => {
+  // Dynamic Cash Flow Chart Data (Monthly vs Yearly aggregation)
+  const cashFlowChartData = useMemo(() => {
+    if (chartPeriod === 'yearly') {
+      const yearlyMap = {}
+      transactions.forEach((t) => {
+        const d = new Date(t.date)
+        if (!isNaN(d.getTime())) {
+          const y = d.getFullYear()
+          if (!yearlyMap[y]) {
+            yearlyMap[y] = { month: String(y), income: 0, expenses: 0 }
+          }
+          if (t.type === 'income') {
+            yearlyMap[y].income += t.amount
+          } else {
+            yearlyMap[y].expenses += t.amount
+          }
+        }
+      })
+      const sortedYears = Object.keys(yearlyMap).sort()
+      if (sortedYears.length === 0) {
+        const currentY = new Date().getFullYear()
+        return [{ month: String(currentY), income: 0, expenses: 0 }]
+      }
+      return sortedYears.map((y) => yearlyMap[y])
+    }
+
+    // Monthly aggregation for the active / selected year
     const monthlyMap = {}
     MONTH_NAMES.forEach((m, idx) => {
       monthlyMap[idx] = { month: m, income: 0, expenses: 0 }
     })
 
-    const baseTrends = [
-      { month: 'Jan', income: 70000, expenses: 32000 },
-      { month: 'Feb', income: 72000, expenses: 34000 },
-      { month: 'Mar', income: 75000, expenses: 38000 },
-      { month: 'Apr', income: 76000, expenses: 36000 },
-      { month: 'May', income: 78000, expenses: 35000 },
-      { month: 'Jun', income: 80000, expenses: 40000 },
-      { month: 'Jul', income: 82000, expenses: 37000 },
-      { month: 'Aug', income: 84000, expenses: 39000 },
-      { month: 'Sep', income: 85000, expenses: 38000 },
-      { month: 'Oct', income: 0, expenses: 0 },
-      { month: 'Nov', income: 85000, expenses: 36000 },
-      { month: 'Dec', income: 90000, expenses: 42000 },
-    ]
-
-    baseTrends.forEach((b, idx) => {
-      monthlyMap[idx].income = b.income
-      monthlyMap[idx].expenses = b.expenses
-    })
+    const targetYear = selectedDate
+      ? new Date(selectedDate).getFullYear()
+      : new Date().getFullYear()
 
     transactions.forEach((t) => {
       const d = new Date(t.date)
-      if (!isNaN(d.getTime())) {
+      if (!isNaN(d.getTime()) && d.getFullYear() === targetYear) {
         const mIdx = d.getMonth()
         if (mIdx >= 0 && mIdx < 12) {
           if (t.type === 'income') {
-            monthlyMap[mIdx].income = (monthlyMap[mIdx].income || 0) + t.amount
+            monthlyMap[mIdx].income += t.amount
           } else {
-            monthlyMap[mIdx].expenses = (monthlyMap[mIdx].expenses || 0) + t.amount
+            monthlyMap[mIdx].expenses += t.amount
           }
         }
       }
     })
 
     return MONTH_NAMES.map((_, idx) => monthlyMap[idx])
-  }, [transactions])
+  }, [transactions, chartPeriod, selectedDate])
 
   // Category-wise expense doughnut data
   const categoryDoughnutData = useMemo(() => {
@@ -165,7 +174,7 @@ export default function AuthenticatedDashboard({ activeTab = 'Dashboard', onTabC
           {/* Visual Analytics Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <MonthlyBarChart
-              data={monthlyChartData}
+              data={cashFlowChartData}
               period={chartPeriod}
               onPeriodChange={setChartPeriod}
             />

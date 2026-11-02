@@ -26,48 +26,66 @@ export default function BudgetTracker({ transactions = [] }) {
     saveStoredBudgets(userId, budgets)
   }, [budgets, userId])
 
-  // Calculate expenses by category
+  // Calculate current month expenses by category (Monthly budget scope)
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth()
+
   const expenseByCategory = useMemo(() => {
     const map = {}
     transactions.forEach((t) => {
       if (t.type === 'expense') {
-        const cat = t.category || 'Other'
-        map[cat] = (map[cat] || 0) + t.amount
+        const d = new Date(t.date)
+        if (!isNaN(d.getTime()) && d.getFullYear() === currentYear && d.getMonth() === currentMonth) {
+          const cat = t.category || 'Other'
+          map[cat] = (map[cat] || 0) + t.amount
+        }
       }
     })
     return map
-  }, [transactions])
+  }, [transactions, currentYear, currentMonth])
 
-  const totalAllExpenses = useMemo(() => {
+  const totalMonthlyExpenses = useMemo(() => {
     return transactions
-      .filter((t) => t.type === 'expense')
+      .filter((t) => {
+        if (t.type !== 'expense') return false
+        const d = new Date(t.date)
+        return !isNaN(d.getTime()) && d.getFullYear() === currentYear && d.getMonth() === currentMonth
+      })
       .reduce((sum, t) => sum + t.amount, 0)
-  }, [transactions])
+  }, [transactions, currentYear, currentMonth])
 
-  // Summary Metrics
+  // Summary Metrics (prevents double-counting Overall and specific categories)
   const { totalBudgetLimit, totalSpentInBudgets, remainingBudget } = useMemo(() => {
     if (budgets.length === 0) {
       return { totalBudgetLimit: 0, totalSpentInBudgets: 0, remainingBudget: 0 }
     }
 
     let limitSum = 0
-    let spentSum = 0
+    let categorySpentSum = 0
+    let hasOverallBudget = false
 
     budgets.forEach((b) => {
       limitSum += b.limit
       if (b.category === 'Overall') {
-        spentSum += totalAllExpenses
+        hasOverallBudget = true
       } else {
-        spentSum += expenseByCategory[b.category] || 0
+        categorySpentSum += expenseByCategory[b.category] || 0
       }
     })
+
+    // If an Overall budget exists, the total spent across all budgetable expenses is capped
+    // by total monthly expenses without double-counting specific category expenses
+    const spentSum = hasOverallBudget
+      ? Math.max(totalMonthlyExpenses, categorySpentSum)
+      : categorySpentSum
 
     return {
       totalBudgetLimit: limitSum,
       totalSpentInBudgets: spentSum,
       remainingBudget: Math.max(0, limitSum - spentSum),
     }
-  }, [budgets, expenseByCategory, totalAllExpenses])
+  }, [budgets, expenseByCategory, totalMonthlyExpenses])
 
   const handleOpenCreateModal = () => {
     setEditingBudget(null)
@@ -80,6 +98,19 @@ export default function BudgetTracker({ transactions = [] }) {
   }
 
   const handleSaveBudget = (savedBudget) => {
+    // Validate duplicate prevention
+    const isDuplicate = budgets.some(
+      (b) =>
+        b.id !== savedBudget.id &&
+        b.category.toLowerCase() === savedBudget.category.toLowerCase() &&
+        (b.period || 'Monthly').toLowerCase() === (savedBudget.period || 'Monthly').toLowerCase()
+    )
+    if (isDuplicate) {
+      const displayCat = savedBudget.category === 'Overall' ? 'All categories (overall)' : savedBudget.category
+      toast.error(`A ${savedBudget.period} budget for "${displayCat}" already exists.`)
+      return
+    }
+
     if (editingBudget) {
       setBudgets((prev) =>
         prev.map((b) => (b.id === savedBudget.id ? savedBudget : b))
@@ -195,7 +226,7 @@ export default function BudgetTracker({ transactions = [] }) {
           {budgets.map((b) => {
             const spent =
               b.category === 'Overall'
-                ? totalAllExpenses
+                ? totalMonthlyExpenses
                 : expenseByCategory[b.category] || 0
             const pct = Math.min(100, Math.round((spent / b.limit) * 100))
             const remaining = b.limit - spent
@@ -278,6 +309,7 @@ export default function BudgetTracker({ transactions = [] }) {
       <BudgetModal
         isOpen={modalOpen}
         initialBudget={editingBudget}
+        existingBudgets={budgets}
         onClose={() => {
           setModalOpen(false)
           setEditingBudget(null)

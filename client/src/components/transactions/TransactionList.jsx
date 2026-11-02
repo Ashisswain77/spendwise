@@ -51,6 +51,7 @@ export default function TransactionList({
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [walletFilter, setWalletFilter] = useState('all')
   const [timeFilter, setTimeFilter] = useState('all') // 'all' | 'today' | 'week' | 'month' | 'last_month' | 'year'
+  const [sortBy, setSortBy] = useState('date_desc') // 'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc' | 'title_asc'
 
   // Selection state for checkboxes
   const [selectedIds, setSelectedIds] = useState(new Set())
@@ -86,6 +87,7 @@ export default function TransactionList({
     setCategoryFilter('all')
     setWalletFilter('all')
     setTimeFilter('all')
+    setSortBy('date_desc')
     setCurrentPage(1)
     setSelectedIds(new Set())
     toast('Filters cleared', { icon: '🔄' })
@@ -218,12 +220,22 @@ export default function TransactionList({
   })
   const filteredNet = filteredIncome - filteredExpense
 
+  // Sort filtered transactions
+  const sortedTransactions = [...filteredTransactions].sort((a, b) => {
+    if (sortBy === 'date_desc') return new Date(b.date) - new Date(a.date)
+    if (sortBy === 'date_asc') return new Date(a.date) - new Date(b.date)
+    if (sortBy === 'amount_desc') return b.amount - a.amount
+    if (sortBy === 'amount_asc') return a.amount - b.amount
+    if (sortBy === 'title_asc') return (a.title || '').localeCompare(b.title || '')
+    return 0
+  })
+
   // Pagination calculation
-  const totalItems = filteredTransactions.length
+  const totalItems = sortedTransactions.length
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
   const safeCurrentPage = Math.min(currentPage, totalPages)
   const startIndex = (safeCurrentPage - 1) * pageSize
-  const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + pageSize)
+  const paginatedTransactions = sortedTransactions.slice(startIndex, startIndex + pageSize)
   const endIndex = Math.min(startIndex + paginatedTransactions.length, totalItems)
 
   // Selection handlers
@@ -535,8 +547,27 @@ export default function TransactionList({
           </div>
         </div>
 
+        {/* Sort By Select */}
+        <div className="relative">
+          <select
+            value={sortBy}
+            onChange={(e) => {
+              setSortBy(e.target.value)
+              setCurrentPage(1)
+            }}
+            className="appearance-none pl-3 pr-7 py-2 rounded-xl bg-white dark:bg-[#141414] border border-slate-200 dark:border-zinc-800/90 text-slate-700 dark:text-zinc-300 text-xs font-medium focus:border-emerald-500 dark:focus:border-zinc-600 focus:outline-hidden cursor-pointer"
+          >
+            <option value="date_desc">Newest First</option>
+            <option value="date_asc">Oldest First</option>
+            <option value="amount_desc">Amount: High to Low</option>
+            <option value="amount_asc">Amount: Low to High</option>
+            <option value="title_asc">Description: A to Z</option>
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 pointer-events-none" />
+        </div>
+
         {/* Reset Filter Text Link */}
-        {(searchQuery || typeFilter !== 'all' || categoryFilter !== 'all' || walletFilter !== 'all' || timeFilter !== 'all') && (
+        {(searchQuery || typeFilter !== 'all' || categoryFilter !== 'all' || walletFilter !== 'all' || timeFilter !== 'all' || sortBy !== 'date_desc') && (
           <button
             type="button"
             onClick={handleResetFilters}
