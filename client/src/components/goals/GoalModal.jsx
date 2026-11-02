@@ -53,6 +53,31 @@ export default function GoalModal({
 
   if (!isOpen || typeof document === 'undefined') return null
 
+  const handleNameKeyDown = (e) => {
+    if (/^[0-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault()
+      const msg = 'Goal description cannot contain numbers. Only text is allowed.'
+      setError(msg)
+      toast.error(msg, { id: 'no-numbers-goal' })
+    }
+  }
+
+  const handleNameChange = (e) => {
+    const value = e.target.value
+    if (/\d/.test(value)) {
+      const cleaned = value.replace(/[0-9]/g, '')
+      setName(cleaned)
+      const msg = 'Goal description cannot contain numbers. Only text is allowed.'
+      setError(msg)
+      toast.error(msg, { id: 'no-numbers-goal' })
+      return
+    }
+    if (error && error.includes('numbers')) {
+      setError('')
+    }
+    setName(value)
+  }
+
   const handleSubmit = (e) => {
     e.preventDefault()
     setError('')
@@ -60,6 +85,18 @@ export default function GoalModal({
     const cleanName = name.trim()
     if (!cleanName) {
       const msg = 'Please enter a goal name.'
+      setError(msg)
+      toast.error(msg)
+      return
+    }
+    if (/\d/.test(cleanName)) {
+      const msg = 'Goal description cannot contain numbers. Only text is allowed.'
+      setError(msg)
+      toast.error(msg)
+      return
+    }
+    if (!/[a-zA-Z]/.test(cleanName)) {
+      const msg = 'Goal description must contain valid text letters.'
       setError(msg)
       toast.error(msg)
       return
@@ -139,20 +176,26 @@ export default function GoalModal({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Goal Name */}
+          {/* Goal Name / Description */}
           <div>
-            <label
-              htmlFor="goal-name-input"
-              className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1.5"
-            >
-              Goal Name
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label
+                htmlFor="goal-name-input"
+                className="block text-sm font-medium text-slate-700 dark:text-slate-200"
+              >
+                Goal Name / Description
+              </label>
+              <span className="text-xs text-slate-400 dark:text-neutral-500 font-normal">
+                Text only (no numbers)
+              </span>
+            </div>
             <input
               id="goal-name-input"
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., New MacBook"
+              onChange={handleNameChange}
+              onKeyDown={handleNameKeyDown}
+              placeholder="e.g., Emergency Fund, New Laptop"
               className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-neutral-500 text-sm focus:outline-none focus:ring-2 focus:ring-[#8a4f1e]/40 focus:border-[#8a4f1e] transition-all"
               autoFocus
             />

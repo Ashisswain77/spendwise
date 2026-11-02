@@ -41,13 +41,51 @@ export default function TransactionModal({
 
   if ((!modalType && !initialTransaction) || typeof document === 'undefined') return null
 
+  const handleTitleKeyDown = (e) => {
+    if (/^[0-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault()
+      const msg = 'Description cannot contain numbers. Only text is allowed.'
+      setFormError(msg)
+      toast.error(msg, { id: 'no-numbers-tx' })
+    }
+  }
+
+  const handleTitleChange = (e) => {
+    const value = e.target.value
+    if (/\d/.test(value)) {
+      const cleaned = value.replace(/[0-9]/g, '')
+      setFormTitle(cleaned)
+      const msg = 'Description cannot contain numbers. Only text is allowed.'
+      setFormError(msg)
+      toast.error(msg, { id: 'no-numbers-tx' })
+      return
+    }
+    if (formError && formError.includes('numbers')) {
+      setFormError('')
+    }
+    setFormTitle(value)
+  }
+
   const handleSubmit = (e) => {
     e.preventDefault()
     setFormError('')
 
+    const cleanTitle = formTitle.trim()
     const numericAmount = parseFloat(formAmount)
-    if (!formTitle.trim()) {
+    if (!cleanTitle) {
       const msg = 'Please enter a description or merchant name.'
+      setFormError(msg)
+      toast.error(msg)
+      return
+    }
+    if (/\d/.test(cleanTitle)) {
+      const msg = 'Description cannot contain numbers. Only text is allowed.'
+      setFormError(msg)
+      toast.error(msg)
+      return
+    }
+    if (!/[a-zA-Z]/.test(cleanTitle)) {
+      const msg = 'Description must contain valid text letters.'
       setFormError(msg)
       toast.error(msg)
       return
@@ -67,7 +105,7 @@ export default function TransactionModal({
 
     onSave({
       id: initialTransaction?.id || Date.now().toString(),
-      title: formTitle.trim(),
+      title: cleanTitle,
       amount: numericAmount,
       type: effectiveType,
       category: formCategory,
@@ -121,15 +159,21 @@ export default function TransactionModal({
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
           <div>
-            <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-              Description / Note *
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                Description / Note *
+              </label>
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                Text only (no numbers)
+              </span>
+            </div>
             <input
               type="text"
               required
               placeholder={effectiveType === 'income' ? 'e.g. October Salary, Freelance project' : 'e.g. Swiggy, Apartment Rent, Electricity'}
               value={formTitle}
-              onChange={(e) => setFormTitle(e.target.value)}
+              onChange={handleTitleChange}
+              onKeyDown={handleTitleKeyDown}
               className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs focus:border-emerald-600 focus:outline-hidden"
             />
           </div>
