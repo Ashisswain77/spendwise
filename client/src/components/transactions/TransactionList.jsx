@@ -111,6 +111,22 @@ export default function TransactionList({
     })
   }
 
+  // Helper for export to ensure a clean, standard date format (YYYY-MM-DD)
+  const formatExportDate = (dateVal) => {
+    if (!dateVal) return ''
+    if (typeof dateVal === 'string') {
+      const trimmed = dateVal.split('T')[0]
+      if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+        return trimmed
+      }
+    }
+    const d = new Date(dateVal)
+    if (!isNaN(d.getTime())) {
+      return d.toISOString().split('T')[0]
+    }
+    return String(dateVal)
+  }
+
   // Google Sheets / CSV Export with toast.promise
   const handleExportSheets = () => {
     if (filteredTransactions.length === 0) {
@@ -121,25 +137,30 @@ export default function TransactionList({
     const exportAction = new Promise((resolve) => {
       const headers = ['Date', 'Category', 'Note', 'Wallet', 'Type', 'Amount (INR)']
       const rows = filteredTransactions.map((t) => [
-        `"${t.date}"`,
-        `"${t.category || ''}"`,
+        `"${formatExportDate(t.date)}"`,
+        `"${(t.category || '').replace(/"/g, '""')}"`,
         `"${(t.title || '').replace(/"/g, '""')}"`,
-        `"${t.mode || 'DEFAULT'}"`,
-        `"${t.type}"`,
-        t.amount,
+        `"${(t.mode || 'DEFAULT').replace(/"/g, '""')}"`,
+        `"${t.type || ''}"`,
+        typeof t.amount === 'number' ? t.amount : parseFloat(t.amount) || 0,
       ])
 
-      const csvContent =
-        'data:text/csv;charset=utf-8,' +
-        [headers.join(','), ...rows.map((e) => e.join(','))].join('\n')
+      // Prepend UTF-8 BOM (\uFEFF) so Excel/Google Sheets correctly parses the CSV encoding
+      const csvString = [headers.join(','), ...rows.map((e) => e.join(','))].join('\r\n')
+      const blob = new Blob(['\uFEFF' + csvString], { type: 'text/csv;charset=utf-8;' })
 
-      const encodedUri = encodeURI(csvContent)
+      const downloadDate = new Date().toISOString().split('T')[0]
+      const fileName = `SpendWise_Transactions_${downloadDate}.csv`
+
+      const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
-      link.setAttribute('href', encodedUri)
-      link.setAttribute('download', `SpendWise_Transactions_${new Date().toISOString().split('T')[0]}.csv`)
+      link.setAttribute('href', url)
+      link.setAttribute('download', fileName)
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
       setTimeout(resolve, 300)
     })
 
@@ -372,7 +393,8 @@ export default function TransactionList({
   // Format date helper: "26 Oct 2026"
   const formatDateDisplay = (dateStr) => {
     if (!dateStr) return '-'
-    const d = new Date(dateStr + 'T00:00:00')
+    const cleanDate = typeof dateStr === 'string' ? dateStr.split('T')[0] : ''
+    const d = new Date(cleanDate ? cleanDate + 'T00:00:00' : dateStr)
     if (isNaN(d.getTime())) return dateStr
     return d.toLocaleDateString('en-GB', {
       day: 'numeric',
