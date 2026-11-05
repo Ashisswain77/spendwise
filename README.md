@@ -11,7 +11,7 @@
 
 | Dashboard | Transaction History |
 |---|---|
-| ![Dashboard](docs/screenshots/dashboard.png) | ![History](docs/screenshots/history.png) |
+| ![Dashboard](https://github.com/Ashisswain77/spendwise/blob/fe63aa1eb04119453070d176613dafa7bf758638/docs/Screenshot%202026-11-05%20221046.png) | ![History](docs/screenshots/history.png) |
 
 | Budget Management | Savings Goals |
 |---|---|
