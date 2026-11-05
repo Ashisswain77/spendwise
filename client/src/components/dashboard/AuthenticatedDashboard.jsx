@@ -15,7 +15,7 @@ import { CATEGORY_COLORS } from '../../utils/categories'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-export default function AuthenticatedDashboard({ activeTab = 'Dashboard', onTabChange = () => {} }) {
+export default function AuthenticatedDashboard({ activeTab = 'Dashboard', onTabChange = () => { } }) {
   const { user } = useUser()
   const {
     transactions,
@@ -162,6 +162,12 @@ export default function AuthenticatedDashboard({ activeTab = 'Dashboard', onTabC
 
   return (
     <div className="space-y-8 animate-fadeIn pb-12">
+      {error && (
+        <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-400 text-xs sm:text-sm">
+          {error}
+        </div>
+      )}
+
       {/* DASHBOARD HEADER: Only shown on Dashboard tab */}
       {activeTab === 'Dashboard' && (
         <DashboardHeader
@@ -177,13 +183,27 @@ export default function AuthenticatedDashboard({ activeTab = 'Dashboard', onTabC
       {activeTab === 'Dashboard' && (
         <div className="space-y-8">
           {/* Summary Metric Cards */}
-          <SummaryCards
-            remaining={remaining}
-            totalIncome={totalIncome}
-            totalExpenses={totalExpenses}
-            selectedDate={selectedDate}
-            dateRange={dateRange}
-          />
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="p-6 rounded-2xl bg-white dark:bg-[#0d0d0f] border border-slate-200/90 dark:border-zinc-800 shadow-xs space-y-3 animate-pulse"
+                >
+                  <div className="h-4 bg-slate-200 dark:bg-zinc-800 rounded w-1/3"></div>
+                  <div className="h-7 bg-slate-200 dark:bg-zinc-800 rounded w-1/2"></div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <SummaryCards
+              remaining={remaining}
+              totalIncome={totalIncome}
+              totalExpenses={totalExpenses}
+              selectedDate={selectedDate}
+              dateRange={dateRange}
+            />
+          )}
 
           {/* Visual Analytics Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

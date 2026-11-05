@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Plus, Pencil, Trash2, RotateCw } from 'lucide-react'
-import { useUser, useAuth } from '@clerk/react'
+import { useAuth } from '@clerk/react'
 import toast from 'react-hot-toast'
 import { formatINR } from '../../utils/currency'
 import {
@@ -12,9 +12,7 @@ import {
 import BudgetModal from './BudgetModal'
 
 export default function BudgetTracker({ transactions = [] }) {
-  const { user } = useUser()
   const { isSignedIn } = useAuth()
-  const userId = user?.id || null
 
   const [budgets, setBudgets] = useState([])
   const [loading, setLoading] = useState(true)
@@ -48,8 +46,39 @@ export default function BudgetTracker({ transactions = [] }) {
   }, [isSignedIn, currentPeriod])
 
   useEffect(() => {
-    loadBudgets()
-  }, [loadBudgets])
+    let ignore = false
+
+    const run = async () => {
+      if (!isSignedIn) {
+        if (!ignore) {
+          setBudgets([])
+          setLoading(false)
+        }
+        return
+      }
+
+      if (!ignore) setLoading(true)
+      setError(null)
+
+      try {
+        const data = await fetchBudgets(currentPeriod)
+        if (!ignore) {
+          setBudgets(data)
+          setError(null)
+        }
+      } catch (err) {
+        if (!ignore) {
+          console.error('Failed to load budgets from backend:', err)
+          setError(err?.response?.data?.message || err.message || 'Failed to load budgets')
+        }
+      } finally {
+        if (!ignore) setLoading(false)
+      }
+    }
+
+    run()
+    return () => { ignore = true }
+  }, [isSignedIn, currentPeriod])
 
   // Current month client-side fallback calculations
   const now = new Date()
@@ -256,6 +285,12 @@ export default function BudgetTracker({ transactions = [] }) {
           </p>
         </div>
       </div>
+
+      {error && (
+        <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-400 text-xs sm:text-sm">
+          {error}
+        </div>
+      )}
 
       {/* MAIN CONTENT: SKELETON / EMPTY STATE / ACTIVE BUDGETS */}
       {loading ? (

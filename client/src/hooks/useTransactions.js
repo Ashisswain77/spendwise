@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useUser, useAuth } from '@clerk/react'
-import toast from 'react-hot-toast'
 import {
   fetchTransactions,
   createTransaction,
@@ -52,15 +51,44 @@ export function useTransactions() {
 
   // Initial load when user authentication state is resolved
   useEffect(() => {
-    if (isLoaded) {
-      if (isSignedIn) {
-        loadTransactions()
-      } else {
-        setTransactions([])
-        setLoading(false)
-      }
-    }
-  }, [isLoaded, isSignedIn, loadTransactions])
+    if (!isLoaded) return
+
+    let ignore = false
+
+        const run = async () => {
+          if (!isSignedIn) {
+            if (!ignore) {
+              setTransactions([])
+              setLoading(false)
+            }
+            return
+          }
+
+            if (!ignore) setLoading(true)
+            setError(null)
+
+            try {
+              if (userId) {
+                await migrateLocalStorageData(userId).catch((err) =>
+                  console.warn('Migration non-fatal error:', err)
+                )
+              }
+              const { transactions: fetchedList } = await fetchTransactions({ limit: 100 })
+              if (!ignore) setTransactions(fetchedList)
+            } catch (err) {
+              if (!ignore) {
+                console.error('Failed to load transactions:', err)
+                setError(err?.response?.data?.message || err.message || 'Failed to load transactions')
+              }
+            } finally {
+              if (!ignore) setLoading(false)
+            }
+          }
+
+          run()
+
+          return () => { ignore = true }
+        }, [isLoaded, isSignedIn, userId])
 
   // Add transaction with optimistic update and rollback
   const addTransaction = async (newTx) => {
