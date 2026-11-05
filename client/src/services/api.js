@@ -1,13 +1,26 @@
 import axios from 'axios'
 import toast from 'react-hot-toast'
 
-// Localhost fallback is only permitted in development; production builds must set VITE_API_URL
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000/api/v1' : '')
+// In production, VITE_API_URL must be provided via environment variables.
+// In development mode (import.meta.env.DEV), safely fall back to local dev server.
+const rawApiUrl = import.meta.env.VITE_API_URL
 
-if (!API_BASE_URL) {
-  console.error('VITE_API_URL is not configured for this production build.')
+if (!rawApiUrl && import.meta.env.DEV) {
+  console.warn(
+    '[SpendWise] VITE_API_URL is not defined. Defaulting to local backend: http://localhost:5000/api/v1'
+  )
 }
+
+if (!rawApiUrl && !import.meta.env.DEV) {
+  console.error(
+    '[SpendWise ERROR] VITE_API_URL is missing in production environment. Requests may fail.'
+  )
+}
+
+const resolvedUrl = rawApiUrl || (import.meta.env.DEV ? 'http://localhost:5000/api/v1' : '')
+
+// Clean trailing slashes so route paths like '/transactions' don't end up with double slashes
+const API_BASE_URL = resolvedUrl.replace(/\/+$/, '')
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
