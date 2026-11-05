@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatINR } from '../../utils/currency'
+import ScrollReveal from '../../components/common/ScrollReveal'
 
 const timeframeData = {
   '3M': [
@@ -132,21 +133,24 @@ export default function DashboardPreview() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="text-center max-w-2xl mx-auto mb-8 sm:mb-10">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-900/50 border border-emerald-500/30 text-emerald-300 text-xs font-semibold mb-3">
-            <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Interactive Live Product Centerpiece</span>
+        <ScrollReveal variant="fade-up">
+          <div className="text-center max-w-2xl mx-auto mb-8 sm:mb-10">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-900/50 border border-emerald-500/30 text-emerald-300 text-xs font-semibold mb-3">
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Interactive Live Product Centerpiece</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
+              Financial clarity you can see &amp; touch.
+            </h2>
+            <p className="text-slate-400 text-sm sm:text-base mt-2">
+              Try the actions below to see how live balances, cash flow trends, and budget progress recalculate on the fly.
+            </p>
           </div>
-          <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-            Financial clarity you can see &amp; touch.
-          </h2>
-          <p className="text-slate-400 text-sm sm:text-base mt-2">
-            Try the actions below to see how live balances, cash flow trends, and budget progress recalculate on the fly.
-          </p>
-        </div>
+        </ScrollReveal>
 
         {/* Dashboard Shell Frame */}
-        <div className="bg-slate-950/90 border border-slate-800 rounded-3xl p-4 sm:p-7 shadow-2xl backdrop-blur-xl transition-all duration-300">
+        <ScrollReveal variant="zoom-in" delay={120}>
+          <div className="bg-slate-950/90 border border-slate-800 rounded-3xl p-4 sm:p-7 shadow-2xl backdrop-blur-xl transition-all duration-300">
           {/* Top Window Bar with Action Pills */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 mb-6 border-b border-slate-800/80">
             <div className="flex items-center gap-2">
@@ -518,6 +522,7 @@ export default function DashboardPreview() {
             </div>
           </div>
         </div>
+        </ScrollReveal>
       </div>
     </section>
   )

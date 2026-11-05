@@ -3,14 +3,53 @@ import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/react'
 import { Menu, X, ArrowRight, Sun, Moon } from 'lucide-react'
 import SpendWiseLogo from '../common/Logo'
 import { getStoredTheme, applyTheme } from '../../utils/theme'
+import { smoothScrollTo } from '../../utils/scroll'
 
 export default function Navbar({ activeTab = 'Dashboard', onTabChange = () => {} }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [theme, setTheme] = useState(getStoredTheme)
+  const [scrollProgress, setScrollProgress] = useState(0)
+  const [activeSection, setActiveSection] = useState('')
 
   useEffect(() => {
     applyTheme(theme)
   }, [theme])
+
+  useEffect(() => {
+    const sectionIds = ['demo', 'features', 'how-it-works', 'faq']
+    let rafId = null
+
+    const handleScroll = () => {
+      if (rafId) cancelAnimationFrame(rafId)
+      rafId = requestAnimationFrame(() => {
+        const scrollTop = window.scrollY
+        const docHeight = document.documentElement.scrollHeight - window.innerHeight
+        const progress = docHeight > 0 ? Math.min(100, Math.max(0, (scrollTop / docHeight) * 100)) : 0
+        setScrollProgress(progress)
+
+        // Determine currently active section in viewport
+        let current = ''
+        for (const id of sectionIds) {
+          const el = document.getElementById(id)
+          if (el) {
+            const rect = el.getBoundingClientRect()
+            if (rect.top <= 160 && rect.bottom >= 160) {
+              current = `#${id}`
+              break
+            }
+          }
+        }
+        setActiveSection(current)
+      })
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    handleScroll()
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+      if (rafId) cancelAnimationFrame(rafId)
+    }
+  }, [])
 
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark'
@@ -26,12 +65,20 @@ export default function Navbar({ activeTab = 'Dashboard', onTabChange = () => {}
   ]
 
   const publicLinks = [
+    { name: 'Live Demo', href: '#demo' },
     { name: 'Features', href: '#features' },
     { name: 'How It Works', href: '#how-it-works' },
+    { name: 'FAQ', href: '#faq' },
   ]
 
+  const handlePublicLinkClick = (e, href) => {
+    e.preventDefault()
+    setMobileMenuOpen(false)
+    smoothScrollTo(href)
+  }
+
   return (
-    <header className="sticky top-0 z-50 backdrop-blur-md bg-white/95 dark:bg-black/95 border-b border-slate-200/80 dark:border-slate-800">
+    <header className="sticky top-0 z-50 backdrop-blur-md bg-white/95 dark:bg-black/95 border-b border-slate-200/80 dark:border-slate-800 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* 1. Brand Logo - Preserved Exactly */}
         <a
@@ -39,6 +86,7 @@ export default function Navbar({ activeTab = 'Dashboard', onTabChange = () => {}
           onClick={(e) => {
             e.preventDefault()
             onTabChange('Dashboard')
+            smoothScrollTo('#')
           }}
           className="flex items-center gap-2 group focus:outline-hidden shrink-0"
           aria-label="SpendWise Home"
@@ -47,7 +95,7 @@ export default function Navbar({ activeTab = 'Dashboard', onTabChange = () => {}
         </a>
 
         {/* 2. Center Navigation */}
-        <nav className="hidden md:flex items-center gap-1 sm:gap-2 lg:gap-6" aria-label="Main Navigation">
+        <nav className="hidden md:flex items-center gap-1 sm:gap-2 lg:gap-4" aria-label="Main Navigation">
           <Show when="signed-in">
             {authenticatedLinks.map((item) => {
               const isActive = activeTab === item.id
@@ -69,15 +117,23 @@ export default function Navbar({ activeTab = 'Dashboard', onTabChange = () => {}
           </Show>
 
           <Show when="signed-out">
-            {publicLinks.map((link) => (
-              <a
-                key={link.name}
-                href={link.href}
-                className="px-3.5 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors duration-150"
-              >
-                {link.name}
-              </a>
-            ))}
+            {publicLinks.map((link) => {
+              const isActive = activeSection === link.href
+              return (
+                <a
+                  key={link.name}
+                  href={link.href}
+                  onClick={(e) => handlePublicLinkClick(e, link.href)}
+                  className={`px-3.5 py-1.5 text-sm font-medium rounded-xl transition-all duration-200 ${
+                    isActive
+                      ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50/90 dark:bg-emerald-950/60 font-semibold'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100/60 dark:hover:bg-slate-900/60'
+                  }`}
+                >
+                  {link.name}
+                </a>
+              )
+            })}
           </Show>
         </nav>
 
@@ -133,6 +189,16 @@ export default function Navbar({ activeTab = 'Dashboard', onTabChange = () => {}
         </div>
       </div>
 
+      {/* Smooth Scroll Progress Bar (Landing Page) */}
+      <Show when="signed-out">
+        <div className="h-[2px] w-full bg-transparent overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-600 transition-all duration-100 ease-out"
+            style={{ width: `${scrollProgress}%` }}
+          />
+        </div>
+      </Show>
+
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div className="md:hidden border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-black px-4 pt-2 pb-5 space-y-3 animate-fadeIn">
@@ -162,7 +228,7 @@ export default function Navbar({ activeTab = 'Dashboard', onTabChange = () => {}
                 <a
                   key={link.name}
                   href={link.href}
-                  onClick={() => setMobileMenuOpen(false)}
+                  onClick={(e) => handlePublicLinkClick(e, link.href)}
                   className="px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 dark:hover:text-emerald-400 rounded-lg transition"
                 >
                   {link.name}
