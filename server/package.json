@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "test": "node test-audit.js"
+    "test:audit": "node test-audit.js",
+    "test:phase2": "node test-phase2.js"
   },
   "keywords": [],
   "author": "",

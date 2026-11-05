@@ -37,9 +37,33 @@ export const validate = (schema) => (req, res, next) => {
             });
         }
 
-        if (parsed.data.body) req.body = parsed.data.body;
-        if (parsed.data.query) req.query = parsed.data.query;
-        if (parsed.data.params) req.params = parsed.data.params;
+        if (parsed.data.body) {
+            req.body = parsed.data.body;
+        }
+
+        if (parsed.data.query) {
+            try {
+                req.query = parsed.data.query;
+            } catch {
+                Object.defineProperty(req, "query", {
+                    value: parsed.data.query,
+                    writable: true,
+                    configurable: true,
+                });
+            }
+        }
+
+        if (parsed.data.params) {
+            try {
+                req.params = parsed.data.params;
+            } catch {
+                Object.defineProperty(req, "params", {
+                    value: parsed.data.params,
+                    writable: true,
+                    configurable: true,
+                });
+            }
+        }
 
         next();
     } catch (err) {

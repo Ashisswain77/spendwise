@@ -5,6 +5,10 @@ import rateLimit from "express-rate-limit";
 import { clerkMiddleware } from "@clerk/express";
 
 import healthRoutes from "./routes/health.routes.js";
+import transactionRoutes from "./routes/transaction.routes.js";
+import budgetRoutes from "./routes/budget.routes.js";
+import goalRoutes from "./routes/goal.routes.js";
+import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
 
@@ -68,13 +72,18 @@ app.get("/", (_req, res) => {
         version: "1.0.0",
         endpoints: {
             health: "/api/v1/health",
-            protectedExample: "/api/v1/health/private",
+            transactions: "/api/v1/transactions",
+            budgets: "/api/v1/budgets",
+            goals: "/api/v1/goals",
         },
         frontend: process.env.FRONTEND_URL || "http://localhost:5173",
     });
 });
 
 app.use("/api/v1/health", healthRoutes);
+app.use("/api/v1/transactions", transactionRoutes);
+app.use("/api/v1/budgets", budgetRoutes);
+app.use("/api/v1/goals", goalRoutes);
 
 // 404 Route Not Found handler
 app.use((req, res) => {
@@ -85,23 +94,6 @@ app.use((req, res) => {
 });
 
 // Centralized error handler
-app.use((err, req, res, _next) => {
-    if (err.message === "CORS_NOT_ALLOWED") {
-        return res.status(403).json({
-            success: false,
-            message: "CORS error: Request origin is not allowed.",
-        });
-    }
-
-    const statusCode = err.statusCode || err.status || 500;
-    const isProduction = process.env.NODE_ENV === "production";
-
-    res.status(statusCode).json({
-        success: false,
-        message: isProduction && statusCode === 500 
-            ? "Internal server error" 
-            : (err.message || "An unexpected error occurred"),
-    });
-});
+    app.use(errorHandler);
 
 export default app;
