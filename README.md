@@ -9,15 +9,10 @@
 
 ## 📸 Screenshots
 
-| Dashboard | Transaction History |
-|---|---|
-| ![Dashboard](https://github.com/Ashisswain77/spendwise/blob/fe63aa1eb04119453070d176613dafa7bf758638/docs/Screenshot%202026-11-05%20221046.png) | ![History](docs/screenshots/history.png) |
+| Main Dashboard | 
 
-| Budget Management | Savings Goals |
-|---|---|
-| ![Budgets](docs/screenshots/budget.png) | ![Goals](docs/screenshots/goals.png) |
+| ![Dashboard](https://github.com/Ashisswain77/spendwise/blob/fe63aa1eb04119453070d176613dafa7bf758638/docs/Screenshot%202026-11-05%20221046.png) 
 
-*Add application screenshots to `docs/screenshots/`.*
 
 ## ✨ Features
 
