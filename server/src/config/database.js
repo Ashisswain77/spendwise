@@ -7,6 +7,9 @@ export async function connectDatabase() {
         throw new Error("MONGODB_URI is missing from server/.env");
     }
 
-    await mongoose.connect(uri);
+    await mongoose.connect(uri, {
+        dbName: process.env.DB_NAME || "spendwise",
+        serverSelectionTimeoutMS: 5000,
+    });
     console.log("MongoDB connected successfully");
 }

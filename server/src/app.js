@@ -15,10 +15,11 @@ app.set("trust proxy", 1);
 app.use(helmet());
 
 // Restrict CORS to trusted origins
-const allowedOrigins = [
-    process.env.FRONTEND_URL,
-    "http://localhost:5173",
-]
+const defaultOrigins = process.env.NODE_ENV === "production" ? [] : ["http://localhost:5173"];
+const envOrigins = process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(",").map((url) => url.trim())
+    : [];
+const allowedOrigins = [...new Set([...envOrigins, ...defaultOrigins])]
     .filter(Boolean)
     .map((url) => url.replace(/\/+$/, ""));
 

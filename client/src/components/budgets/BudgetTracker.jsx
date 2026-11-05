@@ -131,9 +131,7 @@ export default function BudgetTracker({ transactions = [] }) {
 
   return (
     <div className="space-y-6 animate-fadeIn pb-12">
-      {/* =========================================================================
-          1. HEADER (Title, Subtitle, + Add Budget Button)
-         ========================================================================= */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
@@ -154,9 +152,7 @@ export default function BudgetTracker({ transactions = [] }) {
         </button>
       </div>
 
-      {/* =========================================================================
-          2. THREE SUMMARY CARDS (Total Budget, Total Spent, Remaining)
-         ========================================================================= */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Total Budget Card */}
         <div className="p-6 rounded-2xl bg-white dark:bg-[#0d0d0f] border border-slate-200/90 dark:border-zinc-800 shadow-xs">
@@ -189,9 +185,6 @@ export default function BudgetTracker({ transactions = [] }) {
         </div>
       </div>
 
-      {/* =========================================================================
-          3. MAIN CONTENT: EMPTY STATE OR ACTIVE BUDGETS LIST
-         ========================================================================= */}
       {budgets.length === 0 ? (
         /* Empty State matching Screenshot 1 exactly */
         <div className="rounded-2xl border border-slate-200/90 dark:border-zinc-800 bg-white dark:bg-[#0d0d0f] p-12 sm:p-16 text-center shadow-xs">
@@ -272,13 +265,12 @@ export default function BudgetTracker({ transactions = [] }) {
                 <div className="space-y-1.5">
                   <div className="w-full bg-slate-100 dark:bg-zinc-800 rounded-full h-2.5 overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all duration-300 ${
-                        isOver
-                          ? 'bg-rose-500'
-                          : pct >= 80
+                      className={`h-full rounded-full transition-all duration-300 ${isOver
+                        ? 'bg-rose-500'
+                        : pct >= 80
                           ? 'bg-amber-500'
                           : 'bg-[#8a4f1e]'
-                      }`}
+                        }`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
@@ -303,9 +295,6 @@ export default function BudgetTracker({ transactions = [] }) {
         </div>
       )}
 
-      {/* =========================================================================
-          4. NEW / EDIT BUDGET MODAL POPUP
-         ========================================================================= */}
       <BudgetModal
         isOpen={modalOpen}
         initialBudget={editingBudget}

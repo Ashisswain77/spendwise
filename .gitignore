@@ -4,10 +4,22 @@ server/node_modules/
 
 client/dist/
 server/dist/
+coverage/
 
 .env
 .env.*
 !.env.example
 
+# Sensitive credentials & keys
+*.pem
+*.key
+*.cert
+*.crt
+
+# Editor and OS files
 .DS_Store
+Thumbs.db
 *.log
+.vscode/*
+!.vscode/extensions.json
+.idea/
