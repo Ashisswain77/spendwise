@@ -1,35 +1,58 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Flag, Pencil, Trash2, Calendar, CheckCircle2, TrendingUp, Sparkles, ArrowUpRight } from 'lucide-react'
-import { useUser } from '@clerk/react'
+import { Plus, Flag, Pencil, Trash2, Calendar, CheckCircle2, TrendingUp, Sparkles, ArrowUpRight, RotateCw } from 'lucide-react'
+import { useUser, useAuth } from '@clerk/react'
 import toast from 'react-hot-toast'
 import { formatINR } from '../../utils/currency'
-import { loadStoredGoals, saveStoredGoals } from '../../services/transactionService'
+import {
+  fetchGoals,
+  createGoal,
+  updateGoal,
+  deleteGoal,
+  addGoalContribution,
+} from '../../services/goalService'
 import GoalModal from './GoalModal'
 import GoalDepositModal from './GoalDepositModal'
 
 export default function GoalTracker() {
   const { user } = useUser()
+  const { isSignedIn } = useAuth()
   const userId = user?.id || null
 
-  const [prevUserId, setPrevUserId] = useState(userId)
-  const [goals, setGoals] = useState(() => loadStoredGoals(userId))
+  const [goals, setGoals] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingGoal, setEditingGoal] = useState(null)
   const [depositGoal, setDepositGoal] = useState(null)
   const [filter, setFilter] = useState('all') // 'all' | 'in_progress' | 'completed'
   const [deletingGoalId, setDeletingGoalId] = useState(null)
 
-  // Sync with user storage if user changes
-  if (userId !== prevUserId) {
-    setPrevUserId(userId)
-    setGoals(loadStoredGoals(userId))
-  }
+  // Fetch goals from backend API
+  const loadGoals = useCallback(async (silent = false) => {
+    if (!isSignedIn) {
+      setGoals([])
+      setLoading(false)
+      return
+    }
 
-  // Save goals whenever updated
+    if (!silent) setLoading(true)
+    setError(null)
+
+    try {
+      const data = await fetchGoals('all')
+      setGoals(data)
+    } catch (err) {
+      console.error('Failed to load goals from backend:', err)
+      setError(err?.response?.data?.message || err.message || 'Failed to load savings goals')
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }, [isSignedIn])
+
   useEffect(() => {
-    saveStoredGoals(userId, goals)
-  }, [goals, userId])
+    loadGoals()
+  }, [loadGoals])
 
   // Lock body scroll and handle Escape key for delete confirmation
   useEffect(() => {
@@ -56,48 +79,59 @@ export default function GoalTracker() {
     setModalOpen(true)
   }
 
-  const handleSaveGoal = (goalData) => {
-    if (editingGoal) {
-      setGoals((prev) =>
-        prev.map((g) => (g.id === goalData.id ? { ...g, ...goalData } : g))
-      )
-      toast.success(`Savings goal "${goalData.name}" updated!`)
-    } else {
-      setGoals((prev) => [goalData, ...prev])
-      toast.success(`Savings goal "${goalData.name}" created!`)
+  const handleSaveGoal = async (goalData) => {
+    try {
+      if (editingGoal) {
+        const targetId = editingGoal.id || editingGoal._id
+        const updated = await updateGoal(targetId, goalData)
+        setGoals((prev) =>
+          prev.map((g) => ((g.id || g._id) === targetId ? updated : g))
+        )
+        toast.success(`Savings goal "${goalData.name}" updated!`)
+      } else {
+        const created = await createGoal(goalData)
+        setGoals((prev) => [created, ...prev])
+        toast.success(`Savings goal "${goalData.name}" created!`)
+      }
+      setModalOpen(false)
+      setEditingGoal(null)
+    } catch (err) {
+      console.error('Failed to save goal:', err)
     }
-    setModalOpen(false)
-    setEditingGoal(null)
   }
 
-  const handleDeleteGoal = (id) => {
-    setGoals((prev) => prev.filter((g) => g.id !== id))
+  const handleDeleteGoal = async (id) => {
+    const backupGoals = [...goals]
+    // Optimistic removal
+    setGoals((prev) => prev.filter((g) => (g.id || g._id) !== id))
     setDeletingGoalId(null)
-    toast.success('Savings goal deleted.')
+
+    try {
+      await deleteGoal(id)
+      toast.success('Savings goal deleted.')
+    } catch (err) {
+      // Rollback
+      setGoals(backupGoals)
+      console.error('Failed to delete goal:', err)
+    }
   }
 
-  const handleDepositFunds = (goalId, amount) => {
-    setGoals((prev) =>
-      prev.map((g) => {
-        if (g.id === goalId) {
-          const newSaved = Number(g.amountSaved || 0) + Number(amount)
-          const target = Number(g.targetAmount || 0)
-          if (newSaved >= target && Number(g.amountSaved || 0) < target) {
-            toast.success(`🎉 Congratulations! You reached your goal for "${g.name}"!`, {
-              duration: 5000,
-            })
-          } else {
-            toast.success(`Deposited ₹${Number(amount).toLocaleString('en-IN')} to "${g.name}"!`)
-          }
-          return {
-            ...g,
-            amountSaved: newSaved,
-            updatedAt: new Date().toISOString(),
-          }
-        }
-        return g
-      })
-    )
+  const handleDepositFunds = async (goalId, amount) => {
+    try {
+      const { goal: updatedGoal } = await addGoalContribution(goalId, amount)
+      setGoals((prev) =>
+        prev.map((g) => ((g.id || g._id) === goalId ? updatedGoal : g))
+      )
+      if (updatedGoal.status === 'completed') {
+        toast.success(`🎉 Congratulations! You reached your goal for "${updatedGoal.name}"!`, {
+          duration: 5000,
+        })
+      } else {
+        toast.success(`Deposited ₹${Number(amount).toLocaleString('en-IN')} to "${updatedGoal.name}"!`)
+      }
+    } catch (err) {
+      console.error('Failed to record goal deposit:', err)
+    }
   }
 
   // Summary Metrics
@@ -109,7 +143,7 @@ export default function GoalTracker() {
     goals.forEach((g) => {
       targetSum += Number(g.targetAmount || 0)
       savedSum += Number(g.amountSaved || 0)
-      if (Number(g.amountSaved || 0) >= Number(g.targetAmount || 0)) {
+      if (Number(g.amountSaved || 0) >= Number(g.targetAmount || 0) || g.status === 'completed') {
         compCount += 1
       }
     })
@@ -128,338 +162,367 @@ export default function GoalTracker() {
   // Filtered Goals
   const filteredGoals = useMemo(() => {
     if (filter === 'completed') {
-      return goals.filter((g) => Number(g.amountSaved) >= Number(g.targetAmount))
+      return goals.filter(
+        (g) => Number(g.amountSaved || 0) >= Number(g.targetAmount || 0) || g.status === 'completed'
+      )
     }
     if (filter === 'in_progress') {
-      return goals.filter((g) => Number(g.amountSaved) < Number(g.targetAmount))
+      return goals.filter(
+        (g) => Number(g.amountSaved || 0) < Number(g.targetAmount || 0) && g.status !== 'completed'
+      )
     }
     return goals
   }, [goals, filter])
 
-  // Format date helper
-  const formatDate = (dateStr) => {
-    if (!dateStr) return null
-    try {
-      const d = new Date(dateStr)
-      if (isNaN(d.getTime())) return dateStr
-      return d.toLocaleDateString('en-IN', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      })
-    } catch {
-      return dateStr
-    }
-  }
-
-  // Days remaining helper
-  const getDaysRemaining = (dateStr) => {
-    if (!dateStr) return null
-    try {
-      const target = new Date(dateStr)
-      const now = new Date()
-      now.setHours(0, 0, 0, 0)
-      const diffTime = target - now
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-      if (diffDays < 0) return { text: 'Overdue', color: 'text-rose-500' }
-      if (diffDays === 0) return { text: 'Due today', color: 'text-amber-500' }
-      if (diffDays === 1) return { text: '1 day left', color: 'text-amber-500' }
-      return { text: `${diffDays} days left`, color: 'text-slate-500 dark:text-slate-400' }
-    } catch {
-      return null
-    }
-  }
-
   return (
-    <div className="space-y-6 animate-fadeIn">
-      {/* Top Header matching Reference Screenshot */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-6 animate-fadeIn pb-12">
+      {/* 1. Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Goals
-          </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            Track your savings goals
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            Savings Goals
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-neutral-400 mt-1">
+            Track and build your target savings for big milestones
           </p>
         </div>
-        <button
-          type="button"
-          onClick={handleOpenCreateModal}
-          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white bg-[#8a4f1e] hover:bg-[#734017] transition-colors cursor-pointer shadow-sm active:scale-[0.99] self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4 stroke-[2.5]" />
-          Add Goal
-        </button>
+
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => loadGoals(true)}
+            className="p-2.5 text-slate-500 hover:text-slate-800 dark:text-neutral-400 dark:hover:text-white rounded-xl border border-slate-200 dark:border-neutral-800 bg-white dark:bg-[#121212] transition cursor-pointer"
+            title="Refresh goals"
+          >
+            <RotateCw className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handleOpenCreateModal}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#8a4f1e] hover:bg-[#784318] text-white font-bold text-xs sm:text-sm shadow-xs transition active:scale-98 cursor-pointer"
+          >
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <span>New Goal</span>
+          </button>
+        </div>
       </div>
 
-      {/* Empty State matching Reference Screenshot 1 */}
-      {goals.length === 0 ? (
-        <div className="border border-slate-200 dark:border-neutral-800 bg-white dark:bg-black rounded-2xl py-16 sm:py-20 px-6 text-center shadow-xs">
-          <div className="max-w-md mx-auto">
-            <Flag className="w-12 h-12 text-[#9a806d] dark:text-[#7d695b] stroke-[1.5] mx-auto mb-3" />
-            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-1">
-              No goals yet
-            </h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-              Set a financial goal to track your progress
-            </p>
-            <button
-              type="button"
-              onClick={handleOpenCreateModal}
-              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white bg-[#8a4f1e] hover:bg-[#734017] transition-colors cursor-pointer shadow-sm active:scale-[0.99]"
-            >
-              <Plus className="w-4 h-4 stroke-[2.5]" />
-              Add Goal
-            </button>
+      {/* 2. Top Summary Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Target */}
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#121212] border border-slate-200/80 dark:border-neutral-800 shadow-xs">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-500 dark:text-neutral-400 uppercase tracking-wider">
+              Total Target
+            </span>
+            <div className="w-8 h-8 rounded-lg bg-[#8a4f1e]/10 dark:bg-[#8a4f1e]/20 text-[#8a4f1e] flex items-center justify-center">
+              <Flag className="w-4 h-4" />
+            </div>
           </div>
+          <div className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            {formatINR(totalTarget)}
+          </div>
+          <p className="text-xs text-slate-400 dark:text-neutral-500 mt-1">
+            Across {goals.length} {goals.length === 1 ? 'goal' : 'goals'}
+          </p>
         </div>
-      ) : (
-        /* Goals View with Metrics, Filters and Cards */
-        <div className="space-y-6">
-          {/* Summary Metrics Strip */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white dark:bg-black rounded-xl p-4 border border-slate-200/90 dark:border-neutral-800 shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Target</span>
-                <span className="p-1.5 rounded-lg bg-[#f6eee5] dark:bg-[#2c2016] text-[#8a4f1e] dark:text-[#d6986c]">
-                  <Flag className="w-4 h-4" />
-                </span>
-              </div>
-              <p className="text-xl font-bold text-slate-900 dark:text-white mt-2">
-                {formatINR(totalTarget)}
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Across {goals.length} target{goals.length === 1 ? '' : 's'}</p>
-            </div>
 
-            <div className="bg-white dark:bg-black rounded-xl p-4 border border-slate-200/90 dark:border-neutral-800 shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Saved</span>
-                <span className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
-                  <TrendingUp className="w-4 h-4" />
-                </span>
-              </div>
-              <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-2">
-                {formatINR(totalSaved)}
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Accumulated savings</p>
-            </div>
-
-            <div className="bg-white dark:bg-black rounded-xl p-4 border border-slate-200/90 dark:border-neutral-800 shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Remaining</span>
-                <span className="p-1.5 rounded-lg bg-stone-100 dark:bg-neutral-800 text-stone-600 dark:text-stone-300">
-                  <ArrowUpRight className="w-4 h-4" />
-                </span>
-              </div>
-              <p className="text-xl font-bold text-slate-900 dark:text-white mt-2">
-                {formatINR(totalRemaining)}
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">To reach all goals</p>
-            </div>
-
-            <div className="bg-white dark:bg-black rounded-xl p-4 border border-slate-200/90 dark:border-neutral-800 shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Overall Progress</span>
-                <span className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
-                  <Sparkles className="w-4 h-4" />
-                </span>
-              </div>
-              <div className="flex items-baseline gap-2 mt-2">
-                <p className="text-xl font-bold text-slate-900 dark:text-white">{overallPercent}%</p>
-                <span className="text-xs text-slate-500 dark:text-slate-400">
-                  ({completedCount}/{goals.length} achieved)
-                </span>
-              </div>
-              <div className="w-full bg-slate-100 dark:bg-neutral-800 h-1.5 rounded-full mt-2 overflow-hidden">
-                <div
-                  className="bg-[#8a4f1e] h-full rounded-full transition-all duration-500"
-                  style={{ width: `${overallPercent}%` }}
-                />
-              </div>
+        {/* Total Saved */}
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#121212] border border-slate-200/80 dark:border-neutral-800 shadow-xs">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-500 dark:text-neutral-400 uppercase tracking-wider">
+              Total Saved
+            </span>
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4" />
             </div>
           </div>
+          <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight">
+            {formatINR(totalSaved)}
+          </div>
+          <p className="text-xs text-slate-400 dark:text-neutral-500 mt-1">
+            {overallPercent}% of total target
+          </p>
+        </div>
 
-          {/* Filter Pills */}
-          <div className="flex items-center justify-between border-b border-slate-200 dark:border-neutral-800 pb-3">
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setFilter('all')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-                  filter === 'all'
-                    ? 'bg-[#8a4f1e] text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-neutral-900'
-                }`}
-              >
-                All ({goals.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilter('in_progress')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-                  filter === 'in_progress'
-                    ? 'bg-[#8a4f1e] text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-neutral-900'
-                }`}
-              >
-                In Progress ({goals.length - completedCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilter('completed')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-                  filter === 'completed'
-                    ? 'bg-[#8a4f1e] text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-neutral-900'
-                }`}
-              >
-                Completed ({completedCount})
-              </button>
+        {/* Remaining to Goal */}
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#121212] border border-slate-200/80 dark:border-neutral-800 shadow-xs">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-500 dark:text-neutral-400 uppercase tracking-wider">
+              Remaining
+            </span>
+            <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+              <Sparkles className="w-4 h-4" />
             </div>
           </div>
+          <div className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            {formatINR(totalRemaining)}
+          </div>
+          <p className="text-xs text-slate-400 dark:text-neutral-500 mt-1">
+            Amount left to reach all goals
+          </p>
+        </div>
 
-          {/* Goals Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            {filteredGoals.map((goal) => {
-              const target = Number(goal.targetAmount || 0)
-              const saved = Number(goal.amountSaved || 0)
-              const percent = target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : 0
-              const isCompleted = saved >= target
-              const remaining = Math.max(0, target - saved)
-              const daysInfo = getDaysRemaining(goal.targetDate)
+        {/* Completed Goals */}
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#121212] border border-slate-200/80 dark:border-neutral-800 shadow-xs">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-500 dark:text-neutral-400 uppercase tracking-wider">
+              Completed
+            </span>
+            <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            {completedCount} / {goals.length}
+          </div>
+          <p className="text-xs text-slate-400 dark:text-neutral-500 mt-1">
+            {goals.length - completedCount} in progress
+          </p>
+        </div>
+      </div>
 
-              return (
-                <div
-                  key={goal.id}
-                  className="bg-white dark:bg-black rounded-2xl border border-slate-200/90 dark:border-neutral-800 p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group"
-                >
-                  <div>
-                    {/* Header: Badge + Goal Name + Action buttons */}
-                    <div className="flex items-start justify-between gap-3 mb-3.5">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-xl bg-[#f6eee5] dark:bg-[#2c2016] text-[#8a4f1e] dark:text-[#d6986c] flex items-center justify-center shrink-0">
-                          <Flag className="w-5 h-5 stroke-[1.75]" />
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="font-semibold text-slate-900 dark:text-white text-base truncate">
-                            {goal.name}
-                          </h4>
-                          {goal.targetDate ? (
-                            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                              <Calendar className="w-3.5 h-3.5 shrink-0" />
-                              <span>{formatDate(goal.targetDate)}</span>
-                              {daysInfo && (
-                                <span className={`text-[11px] font-medium ${daysInfo.color}`}>
-                                  • {daysInfo.text}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">No target date</p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Card Actions */}
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditModal(goal)}
-                          className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-neutral-800 rounded-lg transition cursor-pointer"
-                          title="Edit goal"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeletingGoalId(goal.id)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition cursor-pointer"
-                          title="Delete goal"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Progress Bar & Percent */}
-                    <div className="space-y-2 my-4">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-medium text-slate-600 dark:text-slate-400">
-                          Progress
-                        </span>
-                        <span
-                          className={`font-bold ${
-                            isCompleted
-                              ? 'text-emerald-600 dark:text-emerald-400'
-                              : 'text-[#8a4f1e] dark:text-[#d6986c]'
-                          }`}
-                        >
-                          {percent}%
-                        </span>
-                      </div>
-                      <div className="w-full bg-slate-100 dark:bg-neutral-800 h-2.5 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${
-                            isCompleted
-                              ? 'bg-emerald-500'
-                              : 'bg-[#8a4f1e]'
-                          }`}
-                          style={{ width: `${percent}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Amounts breakdown */}
-                    <div className="bg-stone-50/70 dark:bg-neutral-900/60 rounded-xl p-3 border border-stone-100 dark:border-neutral-800/80 space-y-1.5 text-xs">
-                      <div className="flex justify-between items-baseline">
-                        <span className="text-slate-500 dark:text-slate-400">Saved:</span>
-                        <span className="font-bold text-slate-900 dark:text-white">
-                          {formatINR(saved)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-baseline">
-                        <span className="text-slate-500 dark:text-slate-400">Target:</span>
-                        <span className="font-semibold text-slate-700 dark:text-slate-300">
-                          {formatINR(target)}
-                        </span>
-                      </div>
-                      <div className="pt-1.5 border-t border-slate-200/60 dark:border-neutral-800 flex justify-between items-baseline">
-                        <span className="text-slate-500 dark:text-slate-400">
-                          {isCompleted ? 'Status:' : 'Remaining:'}
-                        </span>
-                        {isCompleted ? (
-                          <span className="inline-flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            Goal Reached!
-                          </span>
-                        ) : (
-                          <span className="font-semibold text-amber-600 dark:text-amber-400">
-                            {formatINR(remaining)} left
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Quick Deposit / Action Button */}
-                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-neutral-800/80">
-                    <button
-                      type="button"
-                      onClick={() => setDepositGoal(goal)}
-                      className="w-full py-2 px-3 rounded-lg bg-stone-100 hover:bg-stone-200 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-stone-800 dark:text-stone-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      Add Savings to Goal
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
+      {/* 3. Overall Progress Bar */}
+      {goals.length > 0 && (
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#121212] border border-slate-200/80 dark:border-neutral-800 shadow-xs space-y-2">
+          <div className="flex items-center justify-between text-xs font-semibold">
+            <span className="text-slate-700 dark:text-slate-300">Overall Savings Progress</span>
+            <span className="text-[#8a4f1e] dark:text-[#d48b55] font-bold">{overallPercent}%</span>
+          </div>
+          <div className="w-full bg-slate-100 dark:bg-neutral-800 rounded-full h-3 overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-[#8a4f1e] to-emerald-500 rounded-full transition-all duration-500"
+              style={{ width: `${overallPercent}%` }}
+            />
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-neutral-500">
+            <span>{formatINR(totalSaved)} saved</span>
+            <span>{formatINR(totalTarget)} target</span>
           </div>
         </div>
       )}
 
-      {/* Goal Modal (New / Edit) */}
+      {/* 4. Filter Pills */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-neutral-900 border border-slate-200/60 dark:border-neutral-800 text-xs">
+          <button
+            type="button"
+            onClick={() => setFilter('all')}
+            className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
+              filter === 'all'
+                ? 'bg-white dark:bg-neutral-800 text-slate-900 dark:text-white shadow-xs font-bold'
+                : 'text-slate-500 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white'
+            }`}
+          >
+            All Goals ({goals.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter('in_progress')}
+            className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
+              filter === 'in_progress'
+                ? 'bg-white dark:bg-neutral-800 text-slate-900 dark:text-white shadow-xs font-bold'
+                : 'text-slate-500 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white'
+            }`}
+          >
+            In Progress ({goals.length - completedCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter('completed')}
+            className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
+              filter === 'completed'
+                ? 'bg-white dark:bg-neutral-800 text-slate-900 dark:text-white shadow-xs font-bold'
+                : 'text-slate-500 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white'
+            }`}
+          >
+            Completed ({completedCount})
+          </button>
+        </div>
+      </div>
+
+      {/* 5. Main Goals List / Grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="p-5 rounded-2xl bg-white dark:bg-[#121212] border border-slate-200/80 dark:border-neutral-800 shadow-xs space-y-4 animate-pulse"
+            >
+              <div className="h-4 bg-slate-200 dark:bg-neutral-800 rounded w-1/2"></div>
+              <div className="h-2.5 bg-slate-100 dark:bg-neutral-800 rounded-full w-full"></div>
+              <div className="h-3 bg-slate-200 dark:bg-neutral-800 rounded w-1/3"></div>
+            </div>
+          ))}
+        </div>
+      ) : filteredGoals.length === 0 ? (
+        <div className="rounded-2xl border border-slate-200/80 dark:border-neutral-800 bg-white dark:bg-[#121212] p-12 sm:p-16 text-center shadow-xs">
+          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-[#8a4f1e]/10 dark:bg-[#8a4f1e]/20 text-[#8a4f1e] flex items-center justify-center">
+            <Flag className="w-7 h-7" />
+          </div>
+          <h3 className="text-base font-bold text-slate-900 dark:text-white">
+            {filter === 'completed'
+              ? 'No completed goals yet'
+              : filter === 'in_progress'
+              ? 'No in-progress goals'
+              : 'No savings goals set'}
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1 mb-5 max-w-sm mx-auto">
+            {filter === 'completed'
+              ? 'Keep saving towards your active goals to mark them complete!'
+              : 'Create a savings target to begin tracking your deposits and financial milestones.'}
+          </p>
+          {filter === 'all' && (
+            <button
+              type="button"
+              onClick={handleOpenCreateModal}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#8a4f1e] hover:bg-[#784318] text-white font-bold text-xs shadow-xs transition active:scale-98 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Create Your First Goal</span>
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {filteredGoals.map((goal) => {
+            const saved = Number(goal.amountSaved || 0)
+            const target = Number(goal.targetAmount || 0)
+            const percent = target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : 0
+            const isCompleted = saved >= target || goal.status === 'completed'
+            const remaining = Math.max(0, target - saved)
+            const goalId = goal.id || goal._id
+
+            return (
+              <div
+                key={goalId}
+                className={`p-5 rounded-2xl bg-white dark:bg-[#121212] border transition-all shadow-xs flex flex-col justify-between ${
+                  isCompleted
+                    ? 'border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/20 dark:bg-emerald-950/10'
+                    : 'border-slate-200/80 dark:border-neutral-800 hover:border-slate-300 dark:hover:border-neutral-700'
+                }`}
+              >
+                <div>
+                  {/* Card Header */}
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                          isCompleted
+                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                            : 'bg-[#8a4f1e]/10 text-[#8a4f1e] dark:bg-[#8a4f1e]/20 dark:text-[#d48b55]'
+                        }`}
+                      >
+                        {isCompleted ? <CheckCircle2 className="w-5 h-5" /> : <Flag className="w-4 h-4" />}
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                          {goal.name}
+                        </h4>
+                        {goal.targetDate && (
+                          <div className="flex items-center gap-1 text-[11px] text-slate-400 dark:text-neutral-500 mt-0.5">
+                            <Calendar className="w-3 h-3" />
+                            <span>
+                              {new Date(goal.targetDate).toLocaleDateString('en-IN', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              })}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditModal(goal)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-neutral-800 transition cursor-pointer"
+                        title="Edit goal"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeletingGoalId(goalId)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:text-neutral-400 dark:hover:text-rose-400 dark:hover:bg-neutral-800 transition cursor-pointer"
+                        title="Delete goal"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Amounts Overview */}
+                  <div className="space-y-1 mb-3">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-xs text-slate-500 dark:text-neutral-400">Current Saved:</span>
+                      <span className="text-sm font-extrabold text-slate-900 dark:text-white">
+                        {formatINR(saved)}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline justify-between text-xs text-slate-400 dark:text-neutral-500">
+                      <span>Target:</span>
+                      <span className="font-semibold text-slate-700 dark:text-neutral-300">
+                        {formatINR(target)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="space-y-1.5 mb-4">
+                    <div className="w-full bg-slate-100 dark:bg-neutral-800 rounded-full h-2.5 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          isCompleted ? 'bg-emerald-500' : 'bg-[#8a4f1e]'
+                        }`}
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] font-medium">
+                      <span className={isCompleted ? 'text-emerald-600 font-bold' : 'text-slate-500 dark:text-neutral-400'}>
+                        {percent}% achieved
+                      </span>
+                      <span className="text-slate-400 dark:text-neutral-500">
+                        {isCompleted ? 'Completed 🎉' : `${formatINR(remaining)} left`}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card Action: Add Savings Deposit Button */}
+                <div className="pt-3 border-t border-slate-100 dark:border-neutral-800/80">
+                  <button
+                    type="button"
+                    disabled={isCompleted}
+                    onClick={() => setDepositGoal(goal)}
+                    className={`w-full py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                      isCompleted
+                        ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 opacity-80 cursor-default'
+                        : 'bg-[#8a4f1e]/10 hover:bg-[#8a4f1e]/20 text-[#8a4f1e] dark:bg-[#8a4f1e]/20 dark:hover:bg-[#8a4f1e]/30 dark:text-[#d48b55] active:scale-[0.98]'
+                    }`}
+                  >
+                    {isCompleted ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Goal Reached</span>
+                      </>
+                    ) : (
+                      <>
+                        <ArrowUpRight className="w-3.5 h-3.5" />
+                        <span>Add Savings</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* 6. Modals */}
       <GoalModal
         isOpen={modalOpen}
         initialGoal={editingGoal}
@@ -470,7 +533,6 @@ export default function GoalTracker() {
         onSave={handleSaveGoal}
       />
 
-      {/* Goal Deposit Modal (Add Funds) */}
       <GoalDepositModal
         isOpen={Boolean(depositGoal)}
         goal={depositGoal}
@@ -478,42 +540,36 @@ export default function GoalTracker() {
         onDeposit={handleDepositFunds}
       />
 
-      {/* Delete Confirmation Modal (Portaled to document.body to cover full screen) */}
-      {deletingGoalId && typeof document !== 'undefined' &&
+      {/* 7. Delete Confirmation Dialog */}
+      {deletingGoalId &&
         createPortal(
           <div
-            className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
-            onClick={() => setDeletingGoalId(null)}
-            role="dialog"
-            aria-modal="true"
+            className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setDeletingGoalId(null)
+            }}
           >
-            <div
-              className="bg-white dark:bg-[#121212] rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 animate-scaleUp"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="w-10 h-10 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-600 flex items-center justify-center mx-auto mb-3">
-                <Trash2 className="w-5 h-5" />
-              </div>
-              <h4 className="text-base font-bold text-slate-900 dark:text-white text-center">
+            <div className="bg-white dark:bg-[#121212] w-full max-w-sm rounded-2xl p-6 shadow-2xl border border-slate-100 dark:border-neutral-800 text-left animate-scaleUp">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
                 Delete Savings Goal?
-              </h4>
-              <p className="text-xs text-slate-500 dark:text-slate-400 text-center mt-1.5 mb-5">
-                Are you sure you want to delete this goal? This action cannot be undone.
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-neutral-400 mt-2">
+                This will permanently delete this savings goal and all associated contribution records. This action cannot be undone.
               </p>
-              <div className="flex gap-2">
+              <div className="flex items-center justify-end gap-2.5 mt-5">
                 <button
                   type="button"
                   onClick={() => setDeletingGoalId(null)}
-                  className="flex-1 py-2 text-xs font-medium rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-neutral-800 transition cursor-pointer"
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white rounded-xl transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDeleteGoal(deletingGoalId)}
-                  className="flex-1 py-2 text-xs font-semibold rounded-lg bg-rose-600 hover:bg-rose-700 text-white transition cursor-pointer shadow-sm"
+                  className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition cursor-pointer shadow-xs"
                 >
-                  Delete
+                  Delete Goal
                 </button>
               </div>
             </div>

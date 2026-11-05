@@ -21,6 +21,7 @@ export default function GoalModal({
   )
   const [targetDate, setTargetDate] = useState(initialGoal?.targetDate || '')
   const [error, setError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Adjust state during render when initialGoal prop changes
   if (initialGoal !== prevInitialGoal) {
@@ -119,7 +120,8 @@ export default function GoalModal({
     }
 
     const goalData = {
-      id: initialGoal?.id || Date.now().toString(),
+      id: initialGoal?.id || initialGoal?._id,
+      _id: initialGoal?.id || initialGoal?._id,
       name: cleanName,
       targetAmount: numericTarget,
       amountSaved: numericSaved,
@@ -128,7 +130,15 @@ export default function GoalModal({
       updatedAt: new Date().toISOString(),
     }
 
-    onSave(goalData)
+    try {
+      setIsSubmitting(true)
+      const res = onSave(goalData)
+      if (res && typeof res.then === 'function') {
+        res.finally(() => setIsSubmitting(false))
+      }
+    } catch {
+      setIsSubmitting(false)
+    }
   }
 
   return createPortal(
@@ -274,10 +284,11 @@ export default function GoalModal({
           <div className="flex justify-end pt-3">
             <button
               type="submit"
-              className="bg-[#8a4f1e] hover:bg-[#734017] text-white px-7 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer shadow-sm active:scale-[0.99] flex items-center gap-1.5"
+              disabled={isSubmitting}
+              className="bg-[#8a4f1e] hover:bg-[#734017] disabled:opacity-50 disabled:cursor-not-allowed text-white px-7 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer shadow-sm active:scale-[0.99] flex items-center gap-1.5"
             >
-              {!isEditing && <Plus className="w-4 h-4 -ml-0.5" />}
-              {isEditing ? 'Save Changes' : 'Create'}
+              {!isEditing && !isSubmitting && <Plus className="w-4 h-4 -ml-0.5" />}
+              {isSubmitting ? 'Saving...' : isEditing ? 'Save Changes' : 'Create'}
             </button>
           </div>
         </form>

@@ -1,14 +1,23 @@
-import { useState } from 'react'
-import { Show } from '@clerk/react'
+import { useState, useEffect } from 'react'
+import { Show, useAuth } from '@clerk/react'
 import { Toaster } from 'react-hot-toast'
 import Navbar from './components/layout/Navbar'
 import Footer from './components/layout/Footer'
 import BackgroundAnimation from './components/common/BackgroundAnimation'
 import LandingPage from './pages/LandingPage'
 import DashboardPage from './pages/DashboardPage'
+import { setAuthTokenGetter } from './services/api'
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('Dashboard')
+  const { getToken, isLoaded } = useAuth()
+
+  // Initialize Axios with Clerk session token getter as soon as Clerk auth is loaded
+  useEffect(() => {
+    if (isLoaded) {
+      setAuthTokenGetter(getToken)
+    }
+  }, [isLoaded, getToken])
 
   return (
     <div className="relative min-h-screen bg-white/90 dark:bg-black text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-emerald-100 selection:text-emerald-900 dark:selection:bg-emerald-900/40 dark:selection:text-emerald-200">

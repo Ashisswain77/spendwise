@@ -14,6 +14,7 @@ export default function GoalDepositModal({
 }) {
   const [depositAmount, setDepositAmount] = useState('1000')
   const [error, setError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     if (!isOpen) return
@@ -45,8 +46,19 @@ export default function GoalDepositModal({
       return
     }
 
-    onDeposit(goal.id, val)
-    onClose()
+    try {
+      setIsSubmitting(true)
+      const res = onDeposit(goal.id || goal._id, val)
+      if (res && typeof res.then === 'function') {
+        res
+          .then(() => onClose())
+          .finally(() => setIsSubmitting(false))
+      } else {
+        onClose()
+      }
+    } catch {
+      setIsSubmitting(false)
+    }
   }
 
   return createPortal(
@@ -157,10 +169,11 @@ export default function GoalDepositModal({
             </button>
             <button
               type="submit"
-              className="bg-[#8a4f1e] hover:bg-[#734017] text-white px-5 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer shadow-sm flex items-center gap-1.5"
+              disabled={isSubmitting}
+              className="bg-[#8a4f1e] hover:bg-[#734017] disabled:opacity-50 disabled:cursor-not-allowed text-white px-5 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer shadow-sm flex items-center gap-1.5"
             >
               <ArrowUpRight className="w-3.5 h-3.5" />
-              Deposit Funds
+              {isSubmitting ? 'Depositing...' : 'Deposit Funds'}
             </button>
           </div>
         </form>

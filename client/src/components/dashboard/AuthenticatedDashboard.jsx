@@ -20,6 +20,8 @@ export default function AuthenticatedDashboard({ activeTab = 'Dashboard', onTabC
   const {
     transactions,
     filteredTransactions,
+    loading,
+    error,
     selectedDate,
     setSelectedDate,
     dateRange,
@@ -52,25 +54,37 @@ export default function AuthenticatedDashboard({ activeTab = 'Dashboard', onTabC
     setEditingTransaction(null)
   }
 
-  const handleSaveTransaction = (savedTx) => {
-    if (editingTransaction) {
-      updateTransaction(savedTx)
-      toast.success('Transaction updated successfully!')
-    } else {
-      addTransaction(savedTx)
-      toast.success(`${savedTx.type === 'income' ? 'Income' : 'Expense'} of ₹${savedTx.amount.toLocaleString('en-IN')} added!`)
+  const handleSaveTransaction = async (savedTx) => {
+    try {
+      if (editingTransaction) {
+        await updateTransaction(savedTx)
+        toast.success('Transaction updated successfully!')
+      } else {
+        await addTransaction(savedTx)
+        toast.success(`${savedTx.type === 'income' ? 'Income' : 'Expense'} of ₹${Number(savedTx.amount).toLocaleString('en-IN')} added!`)
+      }
+      handleCloseModal()
+    } catch (err) {
+      console.error('Failed to save transaction:', err)
     }
-    handleCloseModal()
   }
 
-  const handleDeleteTransaction = (id) => {
-    deleteTransaction(id)
-    toast.success('Transaction deleted successfully.')
+  const handleDeleteTransaction = async (id) => {
+    try {
+      await deleteTransaction(id)
+      toast.success('Transaction deleted successfully.')
+    } catch (err) {
+      console.error('Failed to delete transaction:', err)
+    }
   }
 
-  const handleDeleteMultiple = (ids) => {
-    deleteMultipleTransactions(ids)
-    toast.success(`${ids.length} transactions deleted successfully.`)
+  const handleDeleteMultiple = async (ids) => {
+    try {
+      await deleteMultipleTransactions(ids)
+      toast.success(`${ids.length} transactions deleted successfully.`)
+    } catch (err) {
+      console.error('Failed to delete multiple transactions:', err)
+    }
   }
 
   // Dynamic Cash Flow Chart Data (Monthly vs Yearly aggregation)

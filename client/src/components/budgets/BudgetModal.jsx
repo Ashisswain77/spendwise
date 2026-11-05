@@ -20,6 +20,7 @@ export default function BudgetModal({
   const [amount, setAmount] = useState(initialBudget ? String(initialBudget.limit) : '5000')
   const [period, setPeriod] = useState(initialBudget?.period || 'Monthly')
   const [error, setError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Adjust state during render when initialBudget prop changes
   if (initialBudget !== prevInitialBudget) {
@@ -76,14 +77,23 @@ export default function BudgetModal({
     }
 
     const budgetData = {
-      id: initialBudget?.id || Date.now().toString(),
+      id: initialBudget?.id || initialBudget?._id,
+      _id: initialBudget?.id || initialBudget?._id,
       category: targetCategory,
       limit: numericAmount,
       period: period,
-      color: CATEGORY_CONFIG[category]?.badgeColor || 'bg-emerald-500',
+      color: CATEGORY_CONFIG[category]?.badgeColor || (targetCategory === 'Overall' ? 'bg-[#8a4f1e]' : 'bg-emerald-500'),
     }
 
-    onSave(budgetData)
+    try {
+      setIsSubmitting(true)
+      const res = onSave(budgetData)
+      if (res && typeof res.then === 'function') {
+        res.finally(() => setIsSubmitting(false))
+      }
+    } catch {
+      setIsSubmitting(false)
+    }
   }
 
   return createPortal(
@@ -194,9 +204,10 @@ export default function BudgetModal({
           <div className="pt-3 flex items-center justify-end">
             <button
               type="submit"
-              className="px-6 py-2.5 text-xs font-bold text-white bg-[#8a4f1e] hover:bg-[#784318] active:scale-98 rounded-xl shadow-xs transition cursor-pointer"
+              disabled={isSubmitting}
+              className="px-6 py-2.5 text-xs font-bold text-white bg-[#8a4f1e] hover:bg-[#784318] disabled:opacity-50 disabled:cursor-not-allowed active:scale-98 rounded-xl shadow-xs transition cursor-pointer"
             >
-              {isEditing ? 'Save Changes' : 'Create'}
+              {isSubmitting ? 'Saving...' : isEditing ? 'Save Changes' : 'Create'}
             </button>
           </div>
         </form>

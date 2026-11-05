@@ -8,24 +8,76 @@ export const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000,
+  timeout: 15000,
 })
 
-// Request interceptor
+let tokenGetter = null
+
+/**
+ * Configure the Clerk session token getter.
+ * Called from top-level App when Clerk authentication state is initialized.
+ */
+export function setAuthTokenGetter(getter) {
+  tokenGetter = getter
+}
+
+// Request interceptor: dynamically attach fresh Clerk session token
 api.interceptors.request.use(
-  (config) => config,
+  async (config) => {
+    // Only bypass auth check for public health checks
+    const isPublic = config.url?.includes('/health') && !config.url?.includes('/private')
+
+    if (tokenGetter) {
+      try {
+        const token = await tokenGetter()
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`
+        } else if (!isPublic) {
+          return Promise.reject(new Error('AUTH_TOKEN_MISSING'))
+        }
+      } catch (err) {
+        console.error('Failed to get Clerk session token:', err)
+        if (!isPublic) {
+          return Promise.reject(err)
+        }
+      }
+    } else if (!isPublic) {
+      // Prevent requests before authentication is ready
+      return Promise.reject(new Error('AUTH_NOT_READY'))
+    }
+
+    return config
+  },
   (error) => {
-    toast.error('Failed to send network request.')
     return Promise.reject(error)
   }
 )
 
-// Response interceptor to automatically catch and toast server-side errors
+// Response interceptor: handle 401, 403, network errors, and user feedback
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // If request was explicitly configured to suppress global toast, skip
+    // Suppress toasts for handled auth readiness checks
+    if (error.message === 'AUTH_NOT_READY' || error.message === 'AUTH_TOKEN_MISSING') {
+      return Promise.reject(error)
+    }
+
+    // If request explicitly opted out of global toast
     if (error.config?.skipToast) {
+      return Promise.reject(error)
+    }
+
+    if (error.response?.status === 401) {
+      toast.error('Session expired or authentication required. Please sign in again.', {
+        id: 'auth-session-expired',
+      })
+      return Promise.reject(error)
+    }
+
+    if (error.response?.status === 403) {
+      toast.error('Access forbidden: Request origin or permission denied.', {
+        id: 'auth-forbidden',
+      })
       return Promise.reject(error)
     }
 
@@ -44,8 +96,6 @@ api.interceptors.response.use(
 
 /**
  * Helper to run any API request with a react-hot-toast promise
- * @param {Promise} requestPromise
- * @param {{ loading?: string, success?: string, error?: string }} options
  */
 export function toastPromise(
   requestPromise,

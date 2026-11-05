@@ -1,51 +1,160 @@
-import { useState, useEffect, useMemo } from 'react'
-import { useUser } from '@clerk/react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useUser, useAuth } from '@clerk/react'
+import toast from 'react-hot-toast'
 import {
-  loadStoredTransactions,
-  saveStoredTransactions,
+  fetchTransactions,
+  createTransaction,
+  updateTransaction as apiUpdateTransaction,
+  deleteTransaction as apiDeleteTransaction,
+  deleteMultipleTransactions as apiDeleteMultipleTransactions,
+  migrateLocalStorageData,
 } from '../services/transactionService'
 
 export function useTransactions() {
   const { user } = useUser()
+  const { isLoaded, isSignedIn } = useAuth()
   const userId = user?.id || null
 
-  const [prevUserId, setPrevUserId] = useState(userId)
-  const [transactions, setTransactions] = useState(() => loadStoredTransactions(userId))
+  const [transactions, setTransactions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [selectedDate, setSelectedDate] = useState(null)
   const [dateRange, setDateRange] = useState('this_month')
 
-  // Adjust state during render when user changes (React recommended pattern)
-  if (userId !== prevUserId) {
-    setPrevUserId(userId)
-    setTransactions(loadStoredTransactions(userId))
-  }
+  // Load transactions from backend API
+  const loadTransactions = useCallback(async (silent = false) => {
+    if (!isSignedIn) {
+      setTransactions([])
+      setLoading(false)
+      return
+    }
 
-  // Save to localStorage when transactions update
+    if (!silent) setLoading(true)
+    setError(null)
+
+    try {
+      // First, run one-time safe migration of existing browser data if not already migrated
+      if (userId) {
+        await migrateLocalStorageData(userId).catch((err) =>
+          console.warn('Migration non-fatal error:', err)
+        )
+      }
+
+      const { transactions: fetchedList } = await fetchTransactions({ limit: 100 })
+      setTransactions(fetchedList)
+    } catch (err) {
+      console.error('Failed to load transactions:', err)
+      setError(err?.response?.data?.message || err.message || 'Failed to load transactions')
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }, [isSignedIn, userId])
+
+  // Initial load when user authentication state is resolved
   useEffect(() => {
-    saveStoredTransactions(userId, transactions)
-  }, [transactions, userId])
+    if (isLoaded) {
+      if (isSignedIn) {
+        loadTransactions()
+      } else {
+        setTransactions([])
+        setLoading(false)
+      }
+    }
+  }, [isLoaded, isSignedIn, loadTransactions])
 
-  const addTransaction = (newTx) => {
-    setTransactions((prev) => [newTx, ...prev])
+  // Add transaction with optimistic update and rollback
+  const addTransaction = async (newTx) => {
+    const tempId = `temp_${Date.now()}`
+    const optimisticTx = {
+      ...newTx,
+      id: tempId,
+      _id: tempId,
+      amount: typeof newTx.amount === 'number' ? newTx.amount : parseFloat(newTx.amount) || 0,
+      mode: newTx.wallet || newTx.mode || 'Cash',
+      wallet: newTx.wallet || newTx.mode || 'Cash',
+    }
+
+    // Optimistically update UI
+    setTransactions((prev) => [optimisticTx, ...prev])
+
+    try {
+      const created = await createTransaction(newTx)
+      // Replace optimistic item with persisted backend document
+      setTransactions((prev) =>
+        prev.map((t) => (t.id === tempId ? created : t))
+      )
+      return created
+    } catch (err) {
+      // Rollback on failure
+      setTransactions((prev) => prev.filter((t) => t.id !== tempId))
+      throw err
+    }
   }
 
-  const updateTransaction = (updatedTx) => {
+  // Update transaction with optimistic update and rollback
+  const updateTransaction = async (updatedTx) => {
+    const targetId = updatedTx.id || updatedTx._id
+    const previousTx = transactions.find((t) => (t.id || t._id) === targetId)
+
+    // Optimistic update
     setTransactions((prev) =>
-      prev.map((t) => (t.id === updatedTx.id ? { ...t, ...updatedTx } : t))
+      prev.map((t) => ((t.id || t._id) === targetId ? { ...t, ...updatedTx } : t))
     )
+
+    try {
+      const persisted = await apiUpdateTransaction(targetId, updatedTx)
+      setTransactions((prev) =>
+        prev.map((t) => ((t.id || t._id) === targetId ? persisted : t))
+      )
+      return persisted
+    } catch (err) {
+      // Rollback to previous state
+      if (previousTx) {
+        setTransactions((prev) =>
+          prev.map((t) => ((t.id || t._id) === targetId ? previousTx : t))
+        )
+      }
+      throw err
+    }
   }
 
-  const deleteTransaction = (id) => {
-    setTransactions((prev) => prev.filter((t) => t.id !== id))
+  // Delete transaction with optimistic update and rollback
+  const deleteTransaction = async (id) => {
+    const previousTx = transactions.find((t) => (t.id || t._id) === id)
+
+    // Optimistically remove
+    setTransactions((prev) => prev.filter((t) => (t.id || t._id) !== id))
+
+    try {
+      await apiDeleteTransaction(id)
+    } catch (err) {
+      // Rollback on failure
+      if (previousTx) {
+        setTransactions((prev) => [previousTx, ...prev])
+      }
+      throw err
+    }
   }
 
-  const deleteMultipleTransactions = (ids) => {
-    const set = new Set(ids)
-    setTransactions((prev) => prev.filter((t) => !set.has(t.id)))
+  // Delete multiple transactions
+  const deleteMultipleTransactions = async (ids = []) => {
+    const idsSet = new Set(ids)
+    const backupTxs = transactions.filter((t) => idsSet.has(t.id || t._id))
+
+    // Optimistically remove
+    setTransactions((prev) => prev.filter((t) => !idsSet.has(t.id || t._id)))
+
+    try {
+      await apiDeleteMultipleTransactions(ids)
+    } catch (err) {
+      // Rollback on failure
+      setTransactions((prev) => [...backupTxs, ...prev])
+      throw err
+    }
   }
 
   const refreshTransactions = () => {
-    setTransactions(loadStoredTransactions(userId))
+    return loadTransactions(true)
   }
 
   // Filtered transactions based on selected date or date range
@@ -80,13 +189,13 @@ export function useTransactions() {
   const totalIncome = useMemo(() => {
     return filteredTransactions
       .filter((t) => t.type === 'income')
-      .reduce((sum, t) => sum + t.amount, 0)
+      .reduce((sum, t) => sum + (t.amount || 0), 0)
   }, [filteredTransactions])
 
   const totalExpenses = useMemo(() => {
     return filteredTransactions
       .filter((t) => t.type === 'expense')
-      .reduce((sum, t) => sum + t.amount, 0)
+      .reduce((sum, t) => sum + (t.amount || 0), 0)
   }, [filteredTransactions])
 
   const remaining = totalIncome - totalExpenses
@@ -94,6 +203,8 @@ export function useTransactions() {
   return {
     transactions,
     filteredTransactions,
+    loading,
+    error,
     selectedDate,
     setSelectedDate,
     dateRange,
