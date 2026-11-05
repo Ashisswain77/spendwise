@@ -9,7 +9,7 @@ services:
   - type: web
     name: spendwise-api
     runtime: node
-    region: oregon
+    region: singapore
     rootDir: server
     buildCommand: npm install
     startCommand: npm start
